@@ -2,7 +2,6 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from openai import OpenAI
 import os
 from dotenv import load_dotenv
 import json
@@ -26,8 +25,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize OpenAI client (v1.0+ style)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Lazy-load OpenAI client for faster cold starts
+client = None
+
+def get_openai_client():
+    global client
+    if client is None:
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return client
 
 # Response Models
 class CryptoAlgorithm(BaseModel):
@@ -154,9 +160,12 @@ You MUST perform all structural analysis, semantic analysis, algorithm detection
 """
     
     try:
+        # Get OpenAI client (lazy-loaded for faster cold starts)
+        openai_client = get_openai_client()
+        
         # Use the modern OpenAI v1.0+ API with proper client
         # Using gpt-4-turbo-preview which supports JSON mode
-        response = client.chat.completions.create(
+        response = openai_client.chat.completions.create(
             model="gpt-4-turbo-preview",
             messages=[
                 {"role": "system", "content": system_prompt},
