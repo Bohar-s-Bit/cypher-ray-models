@@ -67,6 +67,7 @@ class AnalysisResponse(BaseModel):
 
 # API Endpoints
 @app.get("/")
+@app.head("/")  # Add HEAD method for health checks
 async def root():
     """Root endpoint with API information."""
     return {
@@ -80,6 +81,7 @@ async def root():
     }
 
 @app.get("/health")
+@app.head("/health")  # Add HEAD method for health checks
 async def health_check():
     """Health check endpoint for monitoring and load balancers."""
     # Check if OpenAI API key is configured
