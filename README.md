@@ -4,12 +4,12 @@ CypherRay is an advanced system that uses Large Language Models (LLMs) to analyz
 
 ## Features
 
-- 🔍 **Cryptographic Algorithm Detection**: Identifies classical and modern crypto algorithms (AES, RSA, SHA, etc.)
-- 🧬 **Structural Analysis**: Matches Data Flow Graphs to known patterns (Feistel, Merkle-Damgård, etc.)
-- 🤖 **Semantic Analysis**: Provides plain-language explanations of function purposes
-- 🛡️ **Vulnerability Assessment**: Detects weak algorithms, implementation flaws, and security issues
-- 📊 **Explainable AI**: Transparent reasoning for all detections and classifications
-- 🎯 **Confidence Scoring**: Each detection includes a confidence score (0.0 - 1.0)
+- **Cryptographic Algorithm Detection**: Identifies classical and modern crypto algorithms (AES, RSA, SHA, etc.)
+- **Structural Analysis**: Matches Data Flow Graphs to known patterns (Feistel, Merkle-Damgård, etc.)
+- **Semantic Analysis**: Provides plain-language explanations of function purposes
+- **Vulnerability Assessment**: Detects weak algorithms, implementation flaws, and security issues
+- **Explainable AI**: Transparent reasoning for all detections and classifications
+- **Confidence Scoring**: Each detection includes a confidence score (0.0 - 1.0)
 
 ## Supported Algorithms
 
@@ -197,20 +197,8 @@ CypherRay/
 - **Semantic Tagging**: Categorizes operations
 - **Intent Detection**: Determines if functions are cryptographic
 
-### XAI (Explainable AI)
-- Evidence-based reasoning
-- Structural match justification
-- Confidence rationale
-- Transparency about limitations
 
-## Limitations
-
-- Analysis quality depends on LLM capabilities
-- Obfuscated/packed binaries may yield incomplete results
-- Custom/proprietary algorithms may not be identified
-- Binary size limits apply (consider chunking for large files)
-
-## Future Enhancements
+## Enhancements need to be done
 
 - [ ] Support for disassembly integration (Ghidra, IDA Pro, radare2)
 - [ ] Multi-model ensemble analysis
@@ -218,11 +206,7 @@ CypherRay/
 - [ ] Automated vulnerability scoring (CVSS)
 - [ ] Integration with threat intelligence feeds
 
-## License
 
-MIT License - See LICENSE file for details
-
-## Contributing
 
 Contributions welcome! Please submit pull requests or open issues for bugs/features.
 
