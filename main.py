@@ -199,8 +199,10 @@ You MUST perform all structural analysis, semantic analysis, algorithm detection
 
 if __name__ == "__main__":
     import uvicorn
+    # Use PORT from environment variable (for Render/Railway) or default to 5000 (local)
+    port = int(os.getenv("PORT", 5000))
     print("🚀 Starting CypherRay ML Analysis Service...")
-    print("📍 Server: http://0.0.0.0:5000")
-    print("📊 Health check: http://localhost:5000/health")
-    print("🔍 Analysis endpoint: http://localhost:5000/analyze")
-    uvicorn.run(app, host="0.0.0.0", port=5000, log_level="info")
+    print(f"📍 Server: http://0.0.0.0:{port}")
+    print(f"📊 Health check: http://localhost:{port}/health")
+    print(f"🔍 Analysis endpoint: http://localhost:{port}/analyze")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
