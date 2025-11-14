@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
-import openai
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 import json
@@ -26,8 +26,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize OpenAI client
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Initialize OpenAI client (v1.0+ style)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Response Models
 class CryptoAlgorithm(BaseModel):
@@ -78,6 +78,20 @@ async def root():
             "/health": "GET - Check service health"
         }
     }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and load balancers."""
+    # Check if OpenAI API key is configured
+    api_key_configured = bool(os.getenv("OPENAI_API_KEY"))
+    
+    return {
+        "status": "healthy" if api_key_configured else "degraded",
+        "service": "CypherRay ML Analysis",
+        "version": "1.0.0",
+        "openai_configured": api_key_configured,
+        "ready": api_key_configured
+    }
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze_binary(file: UploadFile = File(...)):
     """
@@ -94,11 +108,21 @@ async def analyze_binary(file: UploadFile = File(...)):
     - XAI explanations
     """
     
-    # Read file content
-    file_content = await file.read()
-    
-    if len(file_content) == 0:
-        raise HTTPException(status_code=400, detail="Empty file uploaded")
+    try:
+        # Read file content
+        file_content = await file.read()
+        
+        if len(file_content) == 0:
+            raise HTTPException(status_code=400, detail="Empty file uploaded")
+        
+        # Limit file size to 100MB
+        if len(file_content) > 100 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File too large. Maximum size: 100MB")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
     
     # Encode binary to base64 for LLM
     encoded_binary = base64.b64encode(file_content).decode('utf-8')
@@ -128,27 +152,55 @@ You MUST perform all structural analysis, semantic analysis, algorithm detection
 """
     
     try:
-        # Use the modern OpenAI v1.0+ API
-        response = openai.chat.completions.create(
-            model="gpt-4",
+        # Use the modern OpenAI v1.0+ API with proper client
+        # Using gpt-4-turbo-preview which supports JSON mode
+        response = client.chat.completions.create(
+            model="gpt-4-turbo-preview",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
             temperature=0.2,
-            max_tokens=4096
+            max_tokens=4096,
+            response_format={"type": "json_object"}  # Ensure JSON response
         )
 
         # Extract content using the new response structure
         content = response.choices[0].message.content
-        analysis_json = json.loads(content)
+        
+        if not content:
+            raise HTTPException(status_code=502, detail="LLM returned empty response")
+        
+        # Parse JSON
+        try:
+            analysis_json = json.loads(content)
+        except json.JSONDecodeError as jde:
+            print(f"Invalid JSON from LLM: {content[:500]}...")
+            raise HTTPException(status_code=502, detail=f"LLM returned invalid JSON: {str(jde)}")
+        
+        # Validate and return
         return AnalysisResponse(**analysis_json)
 
-    except json.JSONDecodeError as jde:
-        raise HTTPException(status_code=502, detail=f"LLM returned invalid JSON: {str(jde)}")
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM analysis failed: {str(e)}")
+        # Handle any OpenAI-related errors
+        error_msg = str(e)
+        print(f"Unexpected error during analysis: {error_msg}")
+        
+        if "authentication" in error_msg.lower() or "api_key" in error_msg.lower():
+            raise HTTPException(status_code=401, detail="OpenAI API authentication failed. Check your API key.")
+        elif "rate" in error_msg.lower() and "limit" in error_msg.lower():
+            raise HTTPException(status_code=429, detail="OpenAI API rate limit exceeded. Please try again later.")
+        elif "openai" in error_msg.lower() or "api" in error_msg.lower():
+            raise HTTPException(status_code=502, detail=f"OpenAI API error: {error_msg}")
+        else:
+            raise HTTPException(status_code=500, detail=f"Analysis failed: {error_msg}")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("🚀 Starting CypherRay ML Analysis Service...")
+    print("📍 Server: http://0.0.0.0:5000")
+    print("📊 Health check: http://localhost:5000/health")
+    print("🔍 Analysis endpoint: http://localhost:5000/analyze")
+    uvicorn.run(app, host="0.0.0.0", port=5000, log_level="info")
