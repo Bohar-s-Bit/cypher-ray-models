@@ -1,20 +1,349 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+import openai
 import os
 from dotenv import load_dotenv
 import json
 import base64
+import angr
+import hashlib
+import tempfile
+import claripy
+import logging
+import logfire
 
 # Load environment variables
 load_dotenv()
+
+# Configure Logfire - disable inspect_arguments to avoid introspection warnings
+logfire.configure(inspect_arguments=False)
+
+# Suppress Angr's verbose logging
+logging.getLogger('angr').setLevel(logging.CRITICAL)
+logging.getLogger('cle').setLevel(logging.CRITICAL)
+logging.getLogger('pyvex').setLevel(logging.CRITICAL)
+logging.getLogger('cle.backends.macho').setLevel(logging.CRITICAL)
+
+# ============================================================================
+# ANGR TOOL FUNCTIONS - Called by LLM via Function Calling
+# ============================================================================
+
+def angr_analyze_binary_metadata(binary_path: str) -> Dict[str, Any]:
+    """
+    Extract basic metadata from binary using Angr.
+    Returns file type, architecture, entry point, and cryptographic hashes.
+    """
+    try:
+        # Calculate hashes
+        with open(binary_path, 'rb') as f:
+            content = f.read()
+            md5_hash = hashlib.md5(content).hexdigest()
+            sha1_hash = hashlib.sha1(content).hexdigest()
+            sha256_hash = hashlib.sha256(content).hexdigest()
+        
+        # Load binary with Angr
+        project = angr.Project(binary_path, auto_load_libs=False)
+        
+        return {
+            "file_type": f"{project.loader.main_object.os} {project.arch.name}",
+            "architecture": str(project.arch.name),
+            "size_bytes": os.path.getsize(binary_path),
+            "entry_point": hex(project.entry),
+            "md5": md5_hash,
+            "sha1": sha1_hash,
+            "sha256": sha256_hash,
+            "endianness": project.arch.memory_endness,
+            "bits": project.arch.bits
+        }
+    except Exception as e:
+        return {"error": f"Failed to analyze metadata: {str(e)}"}
+
+def angr_extract_functions(binary_path: str, limit: int = 50) -> Dict[str, Any]:
+    """
+    Extract function information from binary using Angr's CFG analysis.
+    Returns function addresses, names, and basic block counts.
+    """
+    try:
+        project = angr.Project(binary_path, auto_load_libs=False)
+        cfg = project.analyses.CFGFast()
+        
+        functions = []
+        for addr, func in list(cfg.functions.items())[:limit]:
+            functions.append({
+                "address": hex(addr),
+                "name": func.name,
+                "size": func.size,
+                "num_blocks": len(list(func.blocks)),
+                "is_simprocedure": func.is_simprocedure,
+                "is_plt": func.is_plt
+            })
+        
+        return {
+            "total_functions": len(cfg.functions),
+            "functions": functions,
+            "analyzed_count": len(functions)
+        }
+    except Exception as e:
+        return {"error": f"Failed to extract functions: {str(e)}"}
+
+def angr_analyze_strings(binary_path: str) -> Dict[str, Any]:
+    """
+    Extract readable strings from binary that may indicate cryptographic operations.
+    """
+    try:
+        project = angr.Project(binary_path, auto_load_libs=False)
+        
+        crypto_keywords = [
+            'aes', 'rsa', 'des', 'sha', 'md5', 'encrypt', 'decrypt', 'cipher',
+            'key', 'hash', 'crypto', 'ssl', 'tls', 'openssl', 'blowfish',
+            'rc4', 'chacha', 'curve25519', 'ecdsa', 'pbkdf', 'bcrypt'
+        ]
+        
+        # Extract strings from binary sections
+        interesting_strings = []
+        for section_name, section in project.loader.main_object.sections_map.items():
+            try:
+                data = project.loader.memory.load(section.vaddr, section.memsize)
+                # Simple string extraction (printable ASCII sequences)
+                current_string = ""
+                for byte in data:
+                    if 32 <= byte <= 126:  # Printable ASCII
+                        current_string += chr(byte)
+                    else:
+                        if len(current_string) >= 4:
+                            string_lower = current_string.lower()
+                            if any(keyword in string_lower for keyword in crypto_keywords):
+                                interesting_strings.append({
+                                    "string": current_string,
+                                    "section": section_name
+                                })
+                        current_string = ""
+            except:
+                continue
+        
+        return {
+            "crypto_related_strings": interesting_strings[:100],  # Limit to first 100
+            "total_found": len(interesting_strings)
+        }
+    except Exception as e:
+        return {"error": f"Failed to analyze strings: {str(e)}"}
+
+def angr_analyze_function_dataflow(binary_path: str, function_address: str, max_depth: int = 20) -> Dict[str, Any]:
+    """
+    Analyze data flow patterns in a specific function to detect crypto operations.
+    Looks for characteristic patterns like XOR loops, rotations, S-box lookups.
+    """
+    try:
+        project = angr.Project(binary_path, auto_load_libs=False)
+        cfg = project.analyses.CFGFast()
+        
+        # Convert address from hex string
+        addr = int(function_address, 16)
+        
+        if addr not in cfg.functions:
+            return {"error": f"Function at {function_address} not found"}
+        
+        func = cfg.functions[addr]
+        
+        # Analyze basic blocks for crypto patterns
+        patterns_detected = []
+        
+        for block in list(func.blocks)[:max_depth]:
+            try:
+                # Get VEX IR for the block
+                vex_block = project.factory.block(block.addr).vex
+                
+                # Look for XOR operations (common in crypto)
+                xor_count = sum(1 for stmt in vex_block.statements if hasattr(stmt, 'op') and 'Xor' in str(stmt.op))
+                if xor_count > 3:
+                    patterns_detected.append(f"Multiple XOR operations ({xor_count}) at {hex(block.addr)} - potential XOR cipher")
+                
+                # Look for rotation operations (common in ARX ciphers)
+                rot_count = sum(1 for stmt in vex_block.statements if hasattr(stmt, 'op') and ('Shl' in str(stmt.op) or 'Shr' in str(stmt.op)))
+                if rot_count > 2:
+                    patterns_detected.append(f"Rotation operations ({rot_count}) at {hex(block.addr)} - potential ARX structure")
+                
+                # Look for array indexing (S-box lookups)
+                load_count = sum(1 for stmt in vex_block.statements if hasattr(stmt, 'tag') and 'Ist_WrTmp' in str(stmt.tag))
+                if load_count > 5:
+                    patterns_detected.append(f"Multiple table lookups ({load_count}) at {hex(block.addr)} - potential S-box operations")
+                    
+            except:
+                continue
+        
+        return {
+            "function_name": func.name,
+            "function_address": hex(addr),
+            "num_blocks_analyzed": min(len(list(func.blocks)), max_depth),
+            "patterns_detected": patterns_detected,
+            "function_size": func.size
+        }
+    except Exception as e:
+        return {"error": f"Failed to analyze function dataflow: {str(e)}"}
+
+def angr_detect_crypto_constants(binary_path: str) -> Dict[str, Any]:
+    """
+    Search for known cryptographic constants in the binary
+    (e.g., AES S-box values, SHA round constants, etc.)
+    """
+    try:
+        project = angr.Project(binary_path, auto_load_libs=False)
+        
+        # Known crypto constants
+        crypto_constants = {
+            "AES_SBOX_FIRST_BYTES": bytes([0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b]),
+            "SHA256_K_FIRST": bytes.fromhex('428a2f98'),
+            "SHA1_INIT_H0": bytes.fromhex('67452301'),
+            "MD5_INIT_A": bytes.fromhex('67452301'),
+            "DES_IP_TABLE_START": bytes([58, 50, 42, 34, 26, 18]),
+        }
+        
+        detected_constants = []
+        
+        # Search through binary sections
+        for const_name, const_bytes in crypto_constants.items():
+            for section_name, section in project.loader.main_object.sections_map.items():
+                try:
+                    data = project.loader.memory.load(section.vaddr, section.memsize)
+                    if const_bytes in data:
+                        offset = data.find(const_bytes)
+                        detected_constants.append({
+                            "constant_name": const_name,
+                            "section": section_name,
+                            "offset": hex(section.vaddr + offset)
+                        })
+                except:
+                    continue
+        
+        return {
+            "detected_constants": detected_constants,
+            "total_found": len(detected_constants)
+        }
+    except Exception as e:
+        return {"error": f"Failed to detect crypto constants: {str(e)}"}
+
+# Tool definitions for OpenAI function calling
+ANGR_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "angr_analyze_binary_metadata",
+            "description": "Extract basic metadata from binary including file type, architecture, hashes (MD5, SHA1, SHA256), entry point, and endianness. Always call this first.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "binary_path": {
+                        "type": "string",
+                        "description": "Path to the binary file to analyze"
+                    }
+                },
+                "required": ["binary_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "angr_extract_functions",
+            "description": "Extract function information including addresses, names, sizes, and basic block counts. Useful for identifying functions to analyze further.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "binary_path": {
+                        "type": "string",
+                        "description": "Path to the binary file"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of functions to return (default: 50)",
+                        "default": 50
+                    }
+                },
+                "required": ["binary_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "angr_analyze_strings",
+            "description": "Extract cryptography-related strings from the binary that may indicate what algorithms are implemented.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "binary_path": {
+                        "type": "string",
+                        "description": "Path to the binary file"
+                    }
+                },
+                "required": ["binary_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "angr_analyze_function_dataflow",
+            "description": "Analyze data flow patterns in a specific function to detect cryptographic operation patterns (XOR loops, rotations, S-box lookups). Call this on suspicious functions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "binary_path": {
+                        "type": "string",
+                        "description": "Path to the binary file"
+                    },
+                    "function_address": {
+                        "type": "string",
+                        "description": "Hexadecimal address of the function to analyze (e.g., '0x401000')"
+                    },
+                    "max_depth": {
+                        "type": "integer",
+                        "description": "Maximum number of basic blocks to analyze (default: 20)",
+                        "default": 20
+                    }
+                },
+                "required": ["binary_path", "function_address"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "angr_detect_crypto_constants",
+            "description": "Search for known cryptographic constants (AES S-box, SHA constants, etc.) in the binary to identify specific algorithms.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "binary_path": {
+                        "type": "string",
+                        "description": "Path to the binary file"
+                    }
+                },
+                "required": ["binary_path"]
+            }
+        }
+    }
+]
+
+# Map function names to actual Python functions
+ANGR_FUNCTION_MAP = {
+    "angr_analyze_binary_metadata": angr_analyze_binary_metadata,
+    "angr_extract_functions": angr_extract_functions,
+    "angr_analyze_strings": angr_analyze_strings,
+    "angr_analyze_function_dataflow": angr_analyze_function_dataflow,
+    "angr_detect_crypto_constants": angr_detect_crypto_constants
+}
 
 app = FastAPI(
     title="CypherRay - Cryptographic Binary Analysis System",
     description="AI-powered cryptographic algorithm detection and binary analysis",
     version="1.0.0"
 )
+
+# Instrument FastAPI with Logfire
+logfire.instrument_fastapi(app)
 
 # CORS middleware
 app.add_middleware(
@@ -25,15 +354,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Lazy-load OpenAI client for faster cold starts
-client = None
-
-def get_openai_client():
-    global client
-    if client is None:
-        from openai import OpenAI
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    return client
+# Initialize OpenAI client
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Response Models
 class CryptoAlgorithm(BaseModel):
@@ -73,7 +395,6 @@ class AnalysisResponse(BaseModel):
 
 # API Endpoints
 @app.get("/")
-@app.head("/")  # Add HEAD method for health checks
 async def root():
     """Root endpoint with API information."""
     return {
@@ -85,25 +406,11 @@ async def root():
             "/health": "GET - Check service health"
         }
     }
-
-@app.get("/health")
-@app.head("/health")  # Add HEAD method for health checks
-async def health_check():
-    """Health check endpoint for monitoring and load balancers."""
-    # Check if OpenAI API key is configured
-    api_key_configured = bool(os.getenv("OPENAI_API_KEY"))
-    
-    return {
-        "status": "healthy" if api_key_configured else "degraded",
-        "service": "CypherRay ML Analysis",
-        "version": "1.0.0",
-        "openai_configured": api_key_configured,
-        "ready": api_key_configured
-    }
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze_binary(file: UploadFile = File(...)):
     """
     Analyze a binary executable for cryptographic algorithms and vulnerabilities.
+    Uses Angr for binary analysis with LLM orchestration via function calling.
     
     - **file**: Binary executable file (.exe, Mach-O, ELF, etc.)
     
@@ -116,104 +423,128 @@ async def analyze_binary(file: UploadFile = File(...)):
     - XAI explanations
     """
     
-    try:
+    with logfire.span('analyze_binary', filename=file.filename):
         # Read file content
         file_content = await file.read()
-        
-        if len(file_content) == 0:
-            raise HTTPException(status_code=400, detail="Empty file uploaded")
-        
-        # Limit file size to 100MB
-        if len(file_content) > 100 * 1024 * 1024:
-            raise HTTPException(status_code=413, detail="File too large. Maximum size: 100MB")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+        logfire.info('File uploaded', filename=file.filename, size_bytes=len(file_content))
     
-    # Encode binary to base64 for LLM
-    encoded_binary = base64.b64encode(file_content).decode('utf-8')
+    if len(file_content) == 0:
+        raise HTTPException(status_code=400, detail="Empty file uploaded")
     
-    # Load system prompt
-    prompt_path = os.path.join("prompts", "system.md")
-    try:
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            system_prompt = f.read()
-    except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="System prompt file not found")
-    
-    # Create user prompt - LLM will handle ALL analysis including hashes and file detection
-    user_prompt = f"""
-Analyze the following binary executable:
-
-**Filename:** {file.filename}
-**Size:** {len(file_content)} bytes
-
-**Binary Content (Base64 encoded):** 
-{encoded_binary}
-
-Please provide a comprehensive cryptographic analysis following the JSON schema specified in the system prompt.
-You MUST calculate the MD5, SHA1, and SHA256 hashes of this binary.
-You MUST detect the file type and architecture.
-You MUST perform all structural analysis, semantic analysis, algorithm detection, and vulnerability assessment.
-"""
+    # Save binary to temporary file for Angr analysis
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as tmp_file:
+        tmp_file.write(file_content)
+        tmp_path = tmp_file.name
     
     try:
-        # Get OpenAI client (lazy-loaded for faster cold starts)
-        openai_client = get_openai_client()
-        
-        # Use the modern OpenAI v1.0+ API with proper client
-        # Using gpt-4-turbo-preview which supports JSON mode
-        response = openai_client.chat.completions.create(
-            model="gpt-4-turbo-preview",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.2,
-            max_tokens=4096,
-            response_format={"type": "json_object"}  # Ensure JSON response
-        )
-
-        # Extract content using the new response structure
-        content = response.choices[0].message.content
-        
-        if not content:
-            raise HTTPException(status_code=502, detail="LLM returned empty response")
-        
-        # Parse JSON
+        # Load system prompt
+        prompt_path = os.path.join("prompts", "system.md")
         try:
-            analysis_json = json.loads(content)
-        except json.JSONDecodeError as jde:
-            print(f"Invalid JSON from LLM: {content[:500]}...")
-            raise HTTPException(status_code=502, detail=f"LLM returned invalid JSON: {str(jde)}")
+            with open(prompt_path, "r", encoding="utf-8") as f:
+                system_prompt = f.read()
+        except FileNotFoundError:
+            raise HTTPException(status_code=500, detail="System prompt file not found")
         
-        # Validate and return
-        return AnalysisResponse(**analysis_json)
+        # Initial user prompt - instruct LLM to use Angr tools
+        user_prompt = f"""
+Analyze the binary executable: **{file.filename}** ({len(file_content)} bytes)
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        # Handle any OpenAI-related errors
-        error_msg = str(e)
-        print(f"Unexpected error during analysis: {error_msg}")
+The binary has been saved to: {tmp_path}
+
+You MUST use the available Angr tools to analyze this binary. Follow this process:
+
+1. Call `angr_analyze_binary_metadata` to get file metadata and hashes
+2. Call `angr_extract_functions` to get function list
+3. Call `angr_analyze_strings` to find crypto-related strings
+4. Call `angr_detect_crypto_constants` to find known crypto constants
+5. Call `angr_analyze_function_dataflow` on suspicious functions to detect crypto patterns
+
+Based on the Angr analysis results, provide a comprehensive cryptographic analysis following the JSON schema.
+"""
         
-        if "authentication" in error_msg.lower() or "api_key" in error_msg.lower():
-            raise HTTPException(status_code=401, detail="OpenAI API authentication failed. Check your API key.")
-        elif "rate" in error_msg.lower() and "limit" in error_msg.lower():
-            raise HTTPException(status_code=429, detail="OpenAI API rate limit exceeded. Please try again later.")
-        elif "openai" in error_msg.lower() or "api" in error_msg.lower():
-            raise HTTPException(status_code=502, detail=f"OpenAI API error: {error_msg}")
-        else:
-            raise HTTPException(status_code=500, detail=f"Analysis failed: {error_msg}")
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        max_iterations = 10
+        iteration = 0
+        
+        # Iterative function calling loop
+        while iteration < max_iterations:
+            iteration += 1
+            
+            response = openai.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                tools=ANGR_TOOLS,
+                tool_choice="auto",
+                temperature=0.2,
+                max_tokens=2048
+            )
+            
+            assistant_message = response.choices[0].message
+            messages.append(assistant_message)
+            
+            # Check if LLM wants to call tools
+            if assistant_message.tool_calls:
+                # Execute each tool call
+                for tool_call in assistant_message.tool_calls:
+                    function_name = tool_call.function.name
+                    function_args = json.loads(tool_call.function.arguments)
+                    
+                    # Execute the Angr function
+                    if function_name in ANGR_FUNCTION_MAP:
+                        with logfire.span(f'angr_tool_{function_name}', **function_args):
+                            function_to_call = ANGR_FUNCTION_MAP[function_name]
+                            function_result = function_to_call(**function_args)
+                            logfire.info(f'{function_name} completed', result_keys=list(function_result.keys()))
+                        
+                        # Add function result to messages
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "name": function_name,
+                            "content": json.dumps(function_result)
+                        })
+            else:
+                # No more tool calls - LLM should have final analysis
+                if assistant_message.content:
+                    try:
+                        analysis_json = json.loads(assistant_message.content)
+                        logfire.info('Analysis completed successfully', 
+                                   num_algorithms=len(analysis_json.get('detected_algorithms', [])),
+                                   has_vulnerabilities=analysis_json.get('vulnerability_assessment', {}).get('has_vulnerabilities', False))
+                        return AnalysisResponse(**analysis_json)
+                    except json.JSONDecodeError:
+                        # Maybe LLM wrapped JSON in markdown
+                        content = assistant_message.content
+                        if "```json" in content:
+                            content = content.split("```json")[1].split("```")[0].strip()
+                        analysis_json = json.loads(content)
+                        logfire.info('Analysis completed successfully (markdown wrapped)', 
+                                   num_algorithms=len(analysis_json.get('detected_algorithms', [])))
+                        return AnalysisResponse(**analysis_json)
+                else:
+                    logfire.error('LLM did not return analysis content')
+                    raise HTTPException(status_code=502, detail="LLM did not return analysis")
+        
+        logfire.error('Max iterations reached', iterations=max_iterations)
+        raise HTTPException(status_code=500, detail="Max iterations reached without completion")
+        
+    except json.JSONDecodeError as jde:
+        logfire.error('JSON decode error', error=str(jde))
+        raise HTTPException(status_code=502, detail=f"LLM returned invalid JSON: {str(jde)}")
+    except Exception as e:
+        logfire.error('Analysis failed', error=str(e), error_type=type(e).__name__)
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+    finally:
+        # Clean up temporary file
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
 
 if __name__ == "__main__":
     import uvicorn
-    # Use PORT from environment variable (for Render/Railway) or default to 5000 (local)
-    port = int(os.getenv("PORT", 5000))
-    print("🚀 Starting CypherRay ML Analysis Service...")
-    print(f"📍 Server: http://0.0.0.0:{port}")
-    print(f"📊 Health check: http://localhost:{port}/health")
-    print(f"🔍 Analysis endpoint: http://localhost:{port}/analyze")
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
