@@ -607,20 +607,36 @@ Based on the Angr analysis results, provide a comprehensive cryptographic analys
                 # No more tool calls - LLM should have final analysis
                 if assistant_message.content:
                     try:
-                        analysis_json = json.loads(assistant_message.content)
+                        # Log what we received from LLM for debugging
+                        content = assistant_message.content
+                        print(f"📝 LLM Response (first 500 chars): {content[:500]}")
+                        logfire.info('LLM response received', content_length=len(content), content_preview=content[:200])
+                        
+                        analysis_json = json.loads(content)
                         logfire.info('Analysis completed successfully', 
                                    num_algorithms=len(analysis_json.get('detected_algorithms', [])),
                                    has_vulnerabilities=analysis_json.get('vulnerability_assessment', {}).get('has_vulnerabilities', False))
                         return AnalysisResponse(**analysis_json)
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as jde:
                         # Maybe LLM wrapped JSON in markdown
-                        content = assistant_message.content
+                        print(f"⚠️ First JSON parse failed: {str(jde)}")
+                        print(f"📝 Full content: {content}")
+                        
                         if "```json" in content:
+                            print("🔄 Trying to extract JSON from markdown...")
                             content = content.split("```json")[1].split("```")[0].strip()
-                        analysis_json = json.loads(content)
-                        logfire.info('Analysis completed successfully (markdown wrapped)', 
-                                   num_algorithms=len(analysis_json.get('detected_algorithms', [])))
-                        return AnalysisResponse(**analysis_json)
+                            print(f"📝 Extracted content (first 500 chars): {content[:500]}")
+                        
+                        # Try parsing again
+                        try:
+                            analysis_json = json.loads(content)
+                            logfire.info('Analysis completed successfully (markdown wrapped)', 
+                                       num_algorithms=len(analysis_json.get('detected_algorithms', [])))
+                            return AnalysisResponse(**analysis_json)
+                        except json.JSONDecodeError as jde2:
+                            print(f"❌ Second JSON parse also failed: {str(jde2)}")
+                            print(f"📝 Content that failed: {content[:1000]}")
+                            raise
                 else:
                     logfire.error('LLM did not return analysis content')
                     raise HTTPException(status_code=502, detail="LLM did not return analysis")
