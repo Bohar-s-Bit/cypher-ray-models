@@ -31,14 +31,14 @@ openai_api_key = os.getenv('OPENAI_API_KEY')
 anthropic_api_key = os.getenv('ANTHROPIC_API_KEY') or os.getenv('ANTRHOPIC_API_KEY')
 
 if not openai_api_key:
-    logger.error("OPENAI_API_KEY not found in environment variables!")
+    logger.error("Primary AI API key not found in environment variables!")
 else:
-    logger.info("✅ OpenAI API key found")
+    logger.info("✅ Primary AI provider configured")
 
 if anthropic_api_key:
-    logger.info("✅ Anthropic API key found")
+    logger.info("✅ Secondary AI provider configured")
 else:
-    logger.warning("⚠️ Anthropic API key not found (optional)")
+    logger.warning("⚠️ Secondary AI provider not configured (optional)")
 
 # Check Angr availability
 if check_angr_available():
@@ -90,8 +90,8 @@ async def startup_event():
     logger.info("=" * 60)
     logger.info("CYPHERRAY ML SERVICE STARTING")
     logger.info("=" * 60)
-    logger.info(f"OpenAI API: {'✅ Configured' if openai_api_key else '❌ Missing'}")
-    logger.info(f"Anthropic API: {'✅ Configured' if anthropic_api_key else '⚠️ Not configured'}")
+    logger.info(f"Primary AI: {'✅ Configured' if openai_api_key else '❌ Missing'}")
+    logger.info(f"Secondary AI: {'✅ Configured' if anthropic_api_key else '⚠️ Not configured'}")
     logger.info(f"Angr: {'✅ Available' if check_angr_available() else '❌ Not available'}")
     logger.info("=" * 60)
 

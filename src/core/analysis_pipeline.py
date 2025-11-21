@@ -396,13 +396,13 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         
         # Add analysis metadata
         final_report['_analysis_metadata'] = {
-            'model_used': result['model'],
-            'provider': result['provider'],
+            'model_used': 'cypherray-ai-engine',
+            'provider': 'cypherray',
             'cost': result['cost'],
             'duration': result['duration']
         }
         
-        logger.info(f"✅ Final synthesis complete using {result['model']} (${result['cost']:.6f})")
+        logger.info(f"✅ Final synthesis complete (${result['cost']:.6f})")
         return final_report
     
     async def analyze_binary(

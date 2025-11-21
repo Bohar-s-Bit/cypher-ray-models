@@ -39,7 +39,7 @@ class OpenAIClient:
         self.cost_tracker = cost_tracker
         self.model_config = model_config or {}
         
-        logger.info("OpenAI client initialized")
+        logger.info("AI client initialized")
     
     def chat_completion(
         self,
@@ -73,7 +73,7 @@ class OpenAIClient:
         
         for attempt in range(max_retries):
             try:
-                logger.debug(f"OpenAI API call attempt {attempt + 1}/{max_retries} | Model: {model}")
+                logger.debug(f"AI API call attempt {attempt + 1}/{max_retries} | Model: {model}")
                 
                 # Make API call
                 response = self.client.chat.completions.create(
@@ -107,7 +107,7 @@ class OpenAIClient:
                     )
                 
                 logger.info(
-                    f"OpenAI call successful | Model: {model} | "
+                    f"AI call successful | Model: CypherRay-AI | "
                     f"Tokens: {input_tokens}+{output_tokens} | "
                     f"Cost: ${cost:.6f} | Duration: {duration:.2f}s"
                 )
@@ -139,7 +139,7 @@ class OpenAIClient:
                 
             except OpenAIError as e:
                 last_error = e
-                logger.error(f"OpenAI API error: {str(e)}")
+                logger.error(f"AI API error: {str(e)}")
                 if attempt < max_retries - 1:
                     time.sleep(2 ** attempt)
                 else:
@@ -162,7 +162,7 @@ class OpenAIClient:
                 error_message=str(last_error)
             )
         
-        raise Exception(f"OpenAI API call failed after {max_retries} retries: {str(last_error)}")
+        raise Exception(f"AI API call failed after {max_retries} retries: {str(last_error)}")
     
     def create_embedding(
         self,

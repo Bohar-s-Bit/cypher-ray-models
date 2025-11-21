@@ -39,7 +39,7 @@ class AnthropicClient:
         self.cost_tracker = cost_tracker
         self.model_config = model_config or {}
         
-        logger.info("Anthropic client initialized")
+        logger.info("AI client initialized")
     
     def create_message(
         self,
@@ -71,7 +71,7 @@ class AnthropicClient:
         
         for attempt in range(max_retries):
             try:
-                logger.debug(f"Anthropic API call attempt {attempt + 1}/{max_retries} | Model: {model}")
+                logger.debug(f"AI API call attempt {attempt + 1}/{max_retries} | Model: {model}")
                 
                 # Make API call
                 response = self.client.messages.create(
@@ -103,7 +103,7 @@ class AnthropicClient:
                     )
                 
                 logger.info(
-                    f"Anthropic call successful | Model: {model} | "
+                    f"AI call successful | Model: CypherRay-AI | "
                     f"Tokens: {input_tokens}+{output_tokens} | "
                     f"Cost: ${cost:.6f} | Duration: {duration:.2f}s"
                 )
@@ -143,7 +143,7 @@ class AnthropicClient:
                 
             except APIError as e:
                 last_error = e
-                logger.error(f"Anthropic API error: {str(e)}")
+                logger.error(f"AI API error: {str(e)}")
                 if attempt < max_retries - 1:
                     time.sleep(2 ** attempt)
                 else:
@@ -166,7 +166,7 @@ class AnthropicClient:
                 error_message=str(last_error)
             )
         
-        raise Exception(f"Anthropic API call failed after {max_retries} retries: {str(last_error)}")
+        raise Exception(f"AI API call failed after {max_retries} retries: {str(last_error)}")
     
     def create_message_stream(
         self,

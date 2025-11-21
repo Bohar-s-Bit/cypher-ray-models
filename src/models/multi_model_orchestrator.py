@@ -152,7 +152,7 @@ class MultiModelOrchestrator:
                 provider = model_config['provider']
                 model_name = model_config['model']
                 
-                logger.info(f"Attempt {retry + 1}/{max_retries + 1}: Using {provider}/{model_name}")
+                logger.info(f"Attempt {retry + 1}/{max_retries + 1}: Analyzing with AI model")
                 
                 # Prepare messages
                 messages = [
@@ -204,7 +204,7 @@ class MultiModelOrchestrator:
                 # Cache successful response
                 self._cache_response(cache_key, result)
                 
-                logger.info(f"Analysis successful with {provider}/{model_name}")
+                logger.info(f"Analysis successful")
                 return result
                 
             except Exception as e:
