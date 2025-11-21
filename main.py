@@ -17,8 +17,24 @@ import logfire
 # Load environment variables
 load_dotenv()
 
-# Configure Logfire - disable inspect_arguments to avoid introspection warnings
-logfire.configure(inspect_arguments=False)
+# Configure Logfire - use environment variables for production
+try:
+    logfire_token = os.getenv('LOGFIRE_TOKEN')
+    if logfire_token:
+        # Production: Use token from environment
+        logfire.configure(
+            token=logfire_token,
+            inspect_arguments=False
+        )
+        print("✅ Logfire configured successfully")
+    else:
+        # Local development: Disable sending to Logfire
+        logfire.configure(inspect_arguments=False, send_to_logfire=False)
+        print("⚠️ Logfire running in local mode (not sending data)")
+except Exception as e:
+    print(f"⚠️ Logfire configuration skipped: {e}")
+    # Continue without Logfire if authentication fails
+    pass
 
 # Suppress Angr's verbose logging
 logging.getLogger('angr').setLevel(logging.CRITICAL)
@@ -547,4 +563,4 @@ Based on the Angr analysis results, provide a comprehensive cryptographic analys
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=5000)

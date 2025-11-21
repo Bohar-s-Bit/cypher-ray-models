@@ -48,6 +48,7 @@ htmlcov/
 
 # Logs
 *.log
+.logfire
 
 # Uploaded binaries (for testing)
 uploads/
