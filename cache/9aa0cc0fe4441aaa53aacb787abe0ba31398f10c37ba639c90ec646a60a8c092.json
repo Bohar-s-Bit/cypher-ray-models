@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "```json\n[\n  {\n    \"name\": \"_aes_sub_bytes\",\n    \"address\": \"0x1000004b0\",\n    \"crypto_operations\": [\"substitute\"],\n    \"explanation\": \"Performs AES S-box substitution, replacing each byte of the state with its corresponding S-box value. This is a core operation in every AES encryption round.\",\n    \"confidence\": 0.95,\n    \"related_algorithm\": \"AES\"\n  },\n  {\n    \"name\": \"_xor_encrypt\",\n    \"address\": \"0x100000534\",\n    \"crypto_operations\": [\"xor\"],\n    \"explanation\": \"Encrypts data by XORing it with a repeating key stream. This is a simple symmetric cipher often used for obfuscation.\",\n    \"confidence\": 0.85,\n    \"related_algorithm\": \"XOR Cipher\"\n  },\n  {\n    \"name\": \"_rotl32\",\n    \"address\": \"0x1000005c8\",\n    \"crypto_operations\": [\"rotation\"],\n    \"explanation\": \"Rotates a 32-bit value left by a specified number of bits. This is a common primitive used in many hash functions and ciphers.\",\n    \"confidence\": 0.65,\n    \"related_algorithm\": null\n  },\n  {\n    \"name\": \"_mod_exp\",\n    \"address\": \"0x1000006b4\",\n    \"crypto_operations\": [\"modular_arithmetic\"],\n    \"explanation\": \"Performs modular exponentiation (base^exp mod n), the core mathematical operation in RSA encryption and decryption.\",\n    \"confidence\": 0.88,\n    \"related_algorithm\": \"RSA\"\n  }\n]\n```",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "usage": {
+      "input_tokens": 5080,
+      "output_tokens": 344,
+      "total_tokens": 5424
+    },
+    "cost": 0.01614,
+    "duration": 2.8621699810028076
+  },
+  "timestamp": 1763727032.0423648,
+  "ttl": 86400,
+  "created_at": "2025-11-21T17:40:32.042366"
+}

@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "```json\n[\n  {\n    \"name\": \"_aes_ecb_encrypt\",\n    \"address\": \"0x1000009f4\",\n    \"crypto_operations\": [\"substitute\", \"permutation\", \"xor\", \"key_expansion\"],\n    \"explanation\": \"Implements AES-256 encryption in ECB mode, performing multiple rounds of substitution, permutation, and XOR operations using expanded keys.\",\n    \"confidence\": 0.95,\n    \"related_algorithm\": \"AES-256\"\n  },\n  {\n    \"name\": \"_sha256_transform\",\n    \"address\": \"0x100000ecc\",\n    \"crypto_operations\": [\"compression\", \"rotation\", \"addition\"],\n    \"explanation\": \"Implements the SHA-256 compression function, processing one 512-bit block through 64 rounds of mixing operations using rotation and addition.\",\n    \"confidence\": 0.92,\n    \"related_algorithm\": \"SHA-256\"\n  },\n  {\n    \"name\": \"_rsa_encrypt\",\n    \"address\": \"0x1000012ec\",\n    \"crypto_operations\": [\"modular_arithmetic\"],\n    \"explanation\": \"Performs RSA encryption using modular exponentiation, a core operation in RSA encryption and decryption.\",\n    \"confidence\": 0.9,\n    \"related_algorithm\": \"RSA-2048\"\n  },\n  {\n    \"name\": \"_chacha20_block\",\n    \"address\": \"0x10000139c\",\n    \"crypto_operations\": [\"addition\", \"rotation\", \"xor\"],\n    \"explanation\": \"Generates a ChaCha20 block, which involves a series of addition, rotation, and XOR operations to produce a keystream block.\",\n    \"confidence\": 0.9,\n    \"related_algorithm\": \"ChaCha20\"\n  },\n  {\n    \"name\": \"_chacha20_encrypt\",\n    \"address\": \"0x100001614\",\n    \"crypto_operations\": [\"xor\"],\n    \"explanation\": \"Encrypts data using the ChaCha20 stream cipher by XORing the plaintext with the generated keystream.\",\n    \"confidence\": 0.9,\n    \"related_algorithm\": \"ChaCha20\"\n  },\n  {\n    \"name\": \"_md5_hash_deprecated\",\n    \"address\": \"0x10000184c\",\n    \"crypto_operations\": [\"compression\", \"rotation\", \"addition\"],\n    \"explanation\": \"Implements the MD5 hash function, which processes data in 512-bit blocks through a series of compression, rotation, and addition operations.\",\n    \"confidence\": 0.8,\n    \"related_algorithm\": \"MD5\"\n  },\n  {\n    \"name\": \"_hmac_sha256\",\n    \"address\": \"0x1000018e0\",\n    \"crypto_operations\": [\"compression\", \"rotation\", \"addition\"],\n    \"explanation\": \"Computes HMAC using SHA-256, involving hashing the message with a key through SHA-256's compression, rotation, and addition operations.\",\n    \"confidence\": 0.9,\n    \"related_algorithm\": \"HMAC-SHA256\"\n  },\n  {\n    \"name\": \"_pbkdf2_derive_key\",\n    \"address\": \"0x100001af4\",\n    \"crypto_operations\": [\"key_expansion\", \"addition\"],\n    \"explanation\": \"Derives a cryptographic key using PBKDF2, which involves repeated hashing and addition operations to strengthen the key.\",\n    \"confidence\": 0.9,\n    \"related_algorithm\": \"PBKDF2\"\n  }\n]\n```",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "usage": {
+      "input_tokens": 10335,
+      "output_tokens": 729,
+      "total_tokens": 11064
+    },
+    "cost": 0.033127500000000004,
+    "duration": 11.381762027740479
+  },
+  "timestamp": 1763726597.870563,
+  "ttl": 86400,
+  "created_at": "2025-11-21T17:33:17.870564"
+}

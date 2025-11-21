@@ -1,0 +1,264 @@
+{
+  "architectures": {
+    "ARM": {
+      "endianness": ["little", "big"],
+      "bit_widths": [32, 64],
+      "crypto_extensions": {
+        "AES": {
+          "instructions": ["AESE", "AESD", "AESMC", "AESIMC"],
+          "patterns": [
+            {
+              "name": "AES Encryption Round",
+              "instructions": ["AESE.8", "AESMC.8"],
+              "confidence": 0.95
+            },
+            {
+              "name": "AES Decryption Round",
+              "instructions": ["AESD.8", "AESIMC.8"],
+              "confidence": 0.95
+            }
+          ]
+        },
+        "SHA": {
+          "instructions": ["SHA1H", "SHA1SU1", "SHA256H", "SHA256SU1"],
+          "patterns": [
+            {
+              "name": "SHA-256 Processing",
+              "instructions": ["SHA256H", "SHA256H2", "SHA256SU0", "SHA256SU1"],
+              "confidence": 0.95
+            }
+          ]
+        },
+        "NEON": {
+          "instructions": ["VEOR", "VSHL", "VSHR", "VADD"],
+          "patterns": [
+            {
+              "name": "NEON XOR Operations",
+              "instructions": ["VEOR"],
+              "min_occurrences": 3,
+              "confidence": 0.7
+            }
+          ]
+        }
+      },
+      "common_crypto_patterns": {
+        "xor_cipher": {
+          "instructions": ["EOR", "VEOR"],
+          "min_occurrences": 5,
+          "confidence": 0.6
+        },
+        "rotation": {
+          "instructions": ["ROR", "ROL", "LSL", "LSR"],
+          "min_occurrences": 3,
+          "confidence": 0.5
+        },
+        "table_lookup": {
+          "instructions": ["LDR", "LDRB"],
+          "pattern": "array_indexing",
+          "min_occurrences": 4,
+          "confidence": 0.6
+        }
+      }
+    },
+    "x86": {
+      "endianness": ["little"],
+      "bit_widths": [32, 64],
+      "crypto_extensions": {
+        "AES-NI": {
+          "instructions": [
+            "AESENC",
+            "AESENCLAST",
+            "AESDEC",
+            "AESDECLAST",
+            "AESKEYGENASSIST",
+            "AESIMC"
+          ],
+          "patterns": [
+            {
+              "name": "AES Encryption with AES-NI",
+              "instructions": ["AESENC", "AESENCLAST"],
+              "confidence": 0.98
+            },
+            {
+              "name": "AES Key Expansion",
+              "instructions": ["AESKEYGENASSIST", "PXOR"],
+              "confidence": 0.95
+            }
+          ]
+        },
+        "SHA-NI": {
+          "instructions": [
+            "SHA1RNDS4",
+            "SHA1NEXTE",
+            "SHA256RNDS2",
+            "SHA256MSG1",
+            "SHA256MSG2"
+          ],
+          "patterns": [
+            {
+              "name": "SHA-256 with SHA-NI",
+              "instructions": ["SHA256RNDS2", "SHA256MSG1"],
+              "confidence": 0.98
+            }
+          ]
+        },
+        "SSE": {
+          "instructions": ["PXOR", "PSHUFD", "PSLLDQ", "PSRLDQ"],
+          "patterns": [
+            {
+              "name": "SSE XOR Operations",
+              "instructions": ["PXOR"],
+              "min_occurrences": 3,
+              "confidence": 0.7
+            }
+          ]
+        }
+      },
+      "common_crypto_patterns": {
+        "xor_cipher": {
+          "instructions": ["XOR", "PXOR"],
+          "min_occurrences": 5,
+          "confidence": 0.6
+        },
+        "rotation": {
+          "instructions": ["ROL", "ROR", "SHLD", "SHRD"],
+          "min_occurrences": 3,
+          "confidence": 0.5
+        },
+        "table_lookup": {
+          "instructions": ["MOV", "MOVZX"],
+          "pattern": "memory_indexing",
+          "min_occurrences": 4,
+          "confidence": 0.6
+        },
+        "byte_swap": {
+          "instructions": ["BSWAP", "XCHG"],
+          "confidence": 0.5
+        }
+      }
+    },
+    "MIPS": {
+      "endianness": ["little", "big"],
+      "bit_widths": [32, 64],
+      "common_crypto_patterns": {
+        "xor_cipher": {
+          "instructions": ["XOR", "XORI"],
+          "min_occurrences": 5,
+          "confidence": 0.6
+        },
+        "rotation": {
+          "instructions": ["SLL", "SRL", "ROTR"],
+          "min_occurrences": 3,
+          "confidence": 0.5
+        },
+        "table_lookup": {
+          "instructions": ["LB", "LBU", "LW"],
+          "pattern": "array_access",
+          "min_occurrences": 4,
+          "confidence": 0.6
+        }
+      }
+    },
+    "RISC-V": {
+      "endianness": ["little"],
+      "bit_widths": [32, 64],
+      "crypto_extensions": {
+        "Zkn": {
+          "description": "NIST Algorithm Suite",
+          "instructions": [
+            "AES32ESI",
+            "AES32ESMI",
+            "AES64ES",
+            "SHA256SIG0",
+            "SHA256SIG1"
+          ]
+        },
+        "Zks": {
+          "description": "ShangMi Algorithm Suite",
+          "instructions": ["SM4ED", "SM4KS", "SM3P0", "SM3P1"]
+        }
+      },
+      "common_crypto_patterns": {
+        "xor_cipher": {
+          "instructions": ["XOR", "XORI"],
+          "min_occurrences": 5,
+          "confidence": 0.6
+        },
+        "rotation": {
+          "instructions": ["SLLI", "SRLI", "ROL", "ROR"],
+          "min_occurrences": 3,
+          "confidence": 0.5
+        }
+      }
+    },
+    "AVR": {
+      "endianness": ["little"],
+      "bit_widths": [8],
+      "common_crypto_patterns": {
+        "xor_cipher": {
+          "instructions": ["EOR"],
+          "min_occurrences": 5,
+          "confidence": 0.6
+        },
+        "rotation": {
+          "instructions": ["LSL", "LSR", "ROL", "ROR"],
+          "min_occurrences": 3,
+          "confidence": 0.5
+        },
+        "table_lookup": {
+          "instructions": ["LPM", "LD"],
+          "pattern": "progmem_access",
+          "min_occurrences": 4,
+          "confidence": 0.6
+        }
+      }
+    }
+  },
+  "detection_rules": {
+    "high_confidence_crypto": {
+      "description": "Patterns that strongly indicate cryptographic operations",
+      "criteria": [
+        {
+          "type": "instruction_match",
+          "threshold": 0.9,
+          "examples": ["AESENC", "SHA256RNDS2", "AESE.8"]
+        },
+        {
+          "type": "constant_match",
+          "threshold": 0.85,
+          "examples": ["AES S-box", "SHA round constants"]
+        }
+      ]
+    },
+    "medium_confidence_crypto": {
+      "description": "Patterns that suggest possible cryptographic operations",
+      "criteria": [
+        {
+          "type": "operation_pattern",
+          "threshold": 0.6,
+          "examples": [
+            "Multiple XOR with rotations",
+            "Table lookups with mixing"
+          ]
+        }
+      ]
+    },
+    "structural_patterns": {
+      "feistel_network": {
+        "pattern": "split-xor-swap-loop",
+        "min_rounds": 8,
+        "confidence": 0.75
+      },
+      "spn_network": {
+        "pattern": "substitution-permutation-loop",
+        "min_rounds": 4,
+        "confidence": 0.7
+      },
+      "arx_cipher": {
+        "pattern": "add-rotate-xor-sequence",
+        "min_rounds": 4,
+        "confidence": 0.65
+      }
+    }
+  }
+}

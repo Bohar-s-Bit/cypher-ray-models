@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "```json\n[\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"high\",\n    \"algorithm\": \"MD5\",\n    \"description\": \"MD5 is deprecated due to collision vulnerabilities. It should not be used for security-sensitive operations.\",\n    \"evidence\": \"String: ';md5' in .text section, String: 'clientMD5' in .rdata section, String: 'serverMD5' in .rdata section\",\n    \"recommendation\": \"Replace MD5 with SHA-256 or SHA-3 for secure hashing.\"\n  },\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"high\",\n    \"algorithm\": \"SHA-1\",\n    \"description\": \"SHA-1 is deprecated due to collision vulnerabilities and should not be used for digital signatures.\",\n    \"evidence\": \"String: ';sha' in .text section, String: '@sHA' in .text section, String: 'SHA-' in .text section\",\n    \"recommendation\": \"Replace SHA-1 with SHA-256 or SHA-3 for secure hashing.\"\n  },\n  {\n    \"type\": \"hardcoded_secret\",\n    \"severity\": \"critical\",\n    \"algorithm\": \"AES\",\n    \"description\": \"Hardcoded encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.\",\n    \"evidence\": \"String: 'aesKey' in .rdata section\",\n    \"extracted_value\": \"aesKey\",\n    \"recommendation\": \"Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt).\"\n  }\n]\n```",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "usage": {
+      "input_tokens": 5507,
+      "output_tokens": 354,
+      "total_tokens": 5861
+    },
+    "cost": 0.0173075,
+    "duration": 5.1142168045043945
+  },
+  "timestamp": 1763727233.874238,
+  "ttl": 86400,
+  "created_at": "2025-11-21T17:43:53.874239"
+}

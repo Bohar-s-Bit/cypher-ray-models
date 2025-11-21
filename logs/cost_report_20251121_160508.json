@@ -1,0 +1,87 @@
+{
+  "session_start": "2025-11-21T16:05:08.918898",
+  "session_duration_hours": 7.277777777777779e-08,
+  "total_cost_usd": 0.12445,
+  "cost_by_model": {
+    "gpt-4o-mini": 0.00045,
+    "gpt-4o": 0.055,
+    "claude-3-5-sonnet-20241022": 0.069
+  },
+  "cost_by_provider": {
+    "openai": 0.05545,
+    "anthropic": 0.069
+  },
+  "token_usage": {
+    "total_input_tokens": 17000,
+    "total_output_tokens": 7000,
+    "total_tokens": 24000,
+    "by_model": {
+      "gpt-4o-mini": {
+        "input": 1000,
+        "output": 500
+      },
+      "gpt-4o": {
+        "input": 8000,
+        "output": 3500
+      },
+      "claude-3-5-sonnet-20241022": {
+        "input": 8000,
+        "output": 3000
+      }
+    }
+  },
+  "call_statistics": {
+    "total_calls": 4,
+    "successful_calls": 3,
+    "failed_calls": 1,
+    "success_rate": 0.75,
+    "average_duration": 12.475000000000001,
+    "total_duration": 49.900000000000006
+  },
+  "detailed_calls": [
+    {
+      "timestamp": "2025-11-21T16:05:08.918905",
+      "model": "gpt-4o-mini",
+      "provider": "openai",
+      "input_tokens": 1000,
+      "output_tokens": 500,
+      "cost": 0.00045,
+      "duration_seconds": 2.5,
+      "success": true,
+      "error_message": null
+    },
+    {
+      "timestamp": "2025-11-21T16:05:08.918912",
+      "model": "gpt-4o",
+      "provider": "openai",
+      "input_tokens": 5000,
+      "output_tokens": 2000,
+      "cost": 0.0325,
+      "duration_seconds": 15.3,
+      "success": true,
+      "error_message": null
+    },
+    {
+      "timestamp": "2025-11-21T16:05:08.918915",
+      "model": "claude-3-5-sonnet-20241022",
+      "provider": "anthropic",
+      "input_tokens": 8000,
+      "output_tokens": 3000,
+      "cost": 0.069,
+      "duration_seconds": 20.1,
+      "success": true,
+      "error_message": null
+    },
+    {
+      "timestamp": "2025-11-21T16:05:08.918917",
+      "model": "gpt-4o",
+      "provider": "openai",
+      "input_tokens": 3000,
+      "output_tokens": 1500,
+      "cost": 0.0225,
+      "duration_seconds": 12.0,
+      "success": false,
+      "error_message": "Rate limit exceeded"
+    }
+  ]
+}
