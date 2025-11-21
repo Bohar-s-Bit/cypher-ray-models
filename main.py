@@ -11,6 +11,7 @@ import hashlib
 import tempfile
 import logging
 import logfire
+import traceback
 
 # Try to import angr - may fail in production environments
 try:
@@ -522,10 +523,23 @@ async def analyze_binary(file: UploadFile = File(...)):
         # Load system prompt
         prompt_path = os.path.join("prompts", "system.md")
         try:
+            if not os.path.exists(prompt_path):
+                # Log current directory and files for debugging
+                cwd = os.getcwd()
+                files = os.listdir(cwd)
+                print(f"ERROR: Prompt file not found at {prompt_path}")
+                print(f"Current directory: {cwd}")
+                print(f"Files in current directory: {files}")
+                if os.path.exists('prompts'):
+                    print(f"Files in prompts directory: {os.listdir('prompts')}")
+                raise FileNotFoundError(f"System prompt file not found at {prompt_path}")
+            
             with open(prompt_path, "r", encoding="utf-8") as f:
                 system_prompt = f.read()
-        except FileNotFoundError:
-            raise HTTPException(status_code=500, detail="System prompt file not found")
+                print(f"✅ Loaded system prompt ({len(system_prompt)} characters)")
+        except FileNotFoundError as fnf:
+            logfire.error('Prompt file not found', path=prompt_path, error=str(fnf))
+            raise HTTPException(status_code=500, detail=f"System prompt file not found: {prompt_path}")
         
         # Initial user prompt - instruct LLM to use Angr tools
         user_prompt = f"""
@@ -615,10 +629,19 @@ Based on the Angr analysis results, provide a comprehensive cryptographic analys
         raise HTTPException(status_code=500, detail="Max iterations reached without completion")
         
     except json.JSONDecodeError as jde:
-        logfire.error('JSON decode error', error=str(jde))
+        error_details = traceback.format_exc()
+        logfire.error('JSON decode error', error=str(jde), traceback=error_details)
+        print(f"JSON DECODE ERROR: {str(jde)}")
+        print(error_details)
         raise HTTPException(status_code=502, detail=f"LLM returned invalid JSON: {str(jde)}")
+    except HTTPException as he:
+        # Re-raise HTTP exceptions (like missing API key)
+        raise he
     except Exception as e:
-        logfire.error('Analysis failed', error=str(e), error_type=type(e).__name__)
+        error_details = traceback.format_exc()
+        logfire.error('Analysis failed', error=str(e), error_type=type(e).__name__, traceback=error_details)
+        print(f"ANALYSIS ERROR ({type(e).__name__}): {str(e)}")
+        print(error_details)
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
     finally:
         # Clean up temporary file
