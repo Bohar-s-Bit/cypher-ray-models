@@ -7,15 +7,33 @@ import os
 from dotenv import load_dotenv
 import json
 import base64
-import angr
 import hashlib
 import tempfile
-import claripy
 import logging
 import logfire
 
+# Try to import angr - may fail in production environments
+try:
+    import angr
+    import claripy
+    ANGR_AVAILABLE = True
+    print("✅ Angr loaded successfully")
+except ImportError as e:
+    ANGR_AVAILABLE = False
+    print(f"⚠️ Angr not available: {e}")
+    print("⚠️ Binary analysis will use fallback mode")
+
 # Load environment variables
 load_dotenv()
+
+# Check critical environment variables
+openai_api_key = os.getenv('OPENAI_API_KEY')
+if not openai_api_key:
+    print("❌ ERROR: OPENAI_API_KEY not found in environment variables!")
+    print("Please set OPENAI_API_KEY in your Render dashboard")
+else:
+    print("✅ OpenAI API key found")
+    openai.api_key = openai_api_key
 
 # Configure Logfire - use environment variables for production
 try:
@@ -52,6 +70,9 @@ def angr_analyze_binary_metadata(binary_path: str) -> Dict[str, Any]:
     Returns file type, architecture, entry point, and cryptographic hashes.
     """
     try:
+        if not ANGR_AVAILABLE:
+            return {"error": "Angr is not available in this environment. Please check server logs."}
+        
         # Calculate hashes
         with open(binary_path, 'rb') as f:
             content = f.read()
@@ -82,6 +103,9 @@ def angr_extract_functions(binary_path: str, limit: int = 50) -> Dict[str, Any]:
     Returns function addresses, names, and basic block counts.
     """
     try:
+        if not ANGR_AVAILABLE:
+            return {"error": "Angr is not available in this environment"}
+        
         project = angr.Project(binary_path, auto_load_libs=False)
         cfg = project.analyses.CFGFast()
         
@@ -109,6 +133,9 @@ def angr_analyze_strings(binary_path: str) -> Dict[str, Any]:
     Extract readable strings from binary that may indicate cryptographic operations.
     """
     try:
+        if not ANGR_AVAILABLE:
+            return {"error": "Angr is not available in this environment"}
+        
         project = angr.Project(binary_path, auto_load_libs=False)
         
         crypto_keywords = [
@@ -152,6 +179,9 @@ def angr_analyze_function_dataflow(binary_path: str, function_address: str, max_
     Looks for characteristic patterns like XOR loops, rotations, S-box lookups.
     """
     try:
+        if not ANGR_AVAILABLE:
+            return {"error": "Angr is not available in this environment"}
+        
         project = angr.Project(binary_path, auto_load_libs=False)
         cfg = project.analyses.CFGFast()
         
@@ -205,6 +235,9 @@ def angr_detect_crypto_constants(binary_path: str) -> Dict[str, Any]:
     (e.g., AES S-box values, SHA round constants, etc.)
     """
     try:
+        if not ANGR_AVAILABLE:
+            return {"error": "Angr is not available in this environment"}
+        
         project = angr.Project(binary_path, auto_load_libs=False)
         
         # Known crypto constants
@@ -420,8 +453,34 @@ async def root():
         "endpoints": {
             "/analyze": "POST - Upload and analyze binary executable",
             "/health": "GET - Check service health"
+        },
+        "status": {
+            "angr_available": ANGR_AVAILABLE,
+            "openai_configured": bool(os.getenv('OPENAI_API_KEY'))
         }
     }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and deployment platforms."""
+    openai_key_present = bool(os.getenv('OPENAI_API_KEY'))
+    
+    health_status = {
+        "status": "healthy" if (ANGR_AVAILABLE and openai_key_present) else "degraded",
+        "angr_available": ANGR_AVAILABLE,
+        "openai_configured": openai_key_present,
+        "service": "CypherRay ML Service",
+        "version": "1.0.0"
+    }
+    
+    # Return 503 if critical dependencies are missing
+    if not openai_key_present:
+        raise HTTPException(
+            status_code=503,
+            detail="OpenAI API key not configured. Set OPENAI_API_KEY environment variable."
+        )
+    
+    return health_status
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze_binary(file: UploadFile = File(...)):
     """
@@ -438,6 +497,13 @@ async def analyze_binary(file: UploadFile = File(...)):
     - Vulnerability assessment
     - XAI explanations
     """
+    
+    # Check if OpenAI is configured
+    if not os.getenv('OPENAI_API_KEY'):
+        raise HTTPException(
+            status_code=503,
+            detail="OpenAI API key not configured. Please contact administrator."
+        )
     
     with logfire.span('analyze_binary', filename=file.filename):
         # Read file content
