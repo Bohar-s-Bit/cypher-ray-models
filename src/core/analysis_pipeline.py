@@ -516,7 +516,7 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
                 'architecture': meta.get('architecture'),
                 'file_type': meta.get('file_type'),
                 'entry_point': meta.get('entry_point'),
-                'size': meta.get('size'),
+                'size_bytes': meta.get('size_bytes'),  # Backend expects size_bytes, not size
                 'md5': meta.get('md5'),
                 'sha256': meta.get('sha256'),
                 'sha1': meta.get('sha1')  # Include SHA-1 for completeness

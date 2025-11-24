@@ -147,7 +147,7 @@ class Recommendation(BaseModel):
 class FileMetadata(BaseModel):
     """Binary file metadata."""
     filename: str = Field(..., description="Original filename")
-    size: int = Field(..., description="File size in bytes")
+    size_bytes: int = Field(..., description="File size in bytes")
     architecture: str = Field(..., description="Architecture (e.g., 'ARM', 'x86_64')")
     file_type: str = Field(..., description="File type (e.g., 'ELF', 'PE', 'Mach-O')")
     md5: str = Field(..., description="MD5 hash")
