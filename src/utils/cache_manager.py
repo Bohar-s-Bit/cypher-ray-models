@@ -6,6 +6,8 @@ Supports in-memory and file-based caching with TTL.
 import json
 import time
 import hashlib
+import os
+import sys
 from pathlib import Path
 from typing import Any, Optional, Dict
 from datetime import datetime
@@ -18,21 +20,48 @@ logger = get_logger(__name__)
 class CacheManager:
     """Manages caching of analysis results with TTL support."""
     
-    def __init__(self, cache_dir: str = "cache", use_file_cache: bool = True):
+    def __init__(self, cache_dir: str = "cache", use_file_cache: bool = True, max_memory_mb: int = 100):
         """
         Initialize cache manager.
         
         Args:
             cache_dir: Directory for file-based cache
             use_file_cache: Whether to use file-based cache (persistent)
+            max_memory_mb: Maximum memory for in-memory cache in MB
         """
         self.cache_dir = Path(cache_dir)
         self.use_file_cache = use_file_cache
         self.memory_cache: Dict[str, Dict[str, Any]] = {}
+        self.max_memory_bytes = max_memory_mb * 1024 * 1024  # Convert to bytes
         
         if self.use_file_cache:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             logger.info(f"Cache directory: {self.cache_dir.absolute()}")
+        
+        logger.info(f"Max in-memory cache size: {max_memory_mb}MB")
+    
+    def _get_memory_usage(self) -> int:
+        """Get approximate memory usage of in-memory cache."""
+        return sys.getsizeof(self.memory_cache)
+    
+    def _evict_oldest(self):
+        """Evict oldest cache entries if memory limit exceeded."""
+        if not self.memory_cache:
+            return
+            
+        memory_usage = self._get_memory_usage()
+        if memory_usage > self.max_memory_bytes:
+            # Sort by timestamp and remove oldest 30%
+            sorted_entries = sorted(
+                self.memory_cache.items(),
+                key=lambda x: x[1]['timestamp']
+            )
+            evict_count = max(1, len(sorted_entries) // 3)
+            
+            for key, _ in sorted_entries[:evict_count]:
+                del self.memory_cache[key]
+            
+            logger.info(f"Evicted {evict_count} old cache entries (memory: {memory_usage / 1024 / 1024:.1f}MB)")
     
     def _get_cache_file_path(self, key: str) -> Path:
         """Get file path for cache key."""
@@ -101,8 +130,9 @@ class CacheManager:
             'created_at': datetime.now().isoformat()
         }
         
-        # Save to memory cache
+        # Save to memory cache with eviction check
         self.memory_cache[key] = entry
+        self._evict_oldest()  # Check and evict if needed
         
         # Save to file cache if enabled
         if self.use_file_cache:

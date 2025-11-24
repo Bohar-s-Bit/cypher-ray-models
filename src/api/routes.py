@@ -3,6 +3,7 @@ FastAPI routes for the CypherRay ML service.
 """
 
 import os
+import gc
 import json
 import tempfile
 import traceback
@@ -263,3 +264,7 @@ async def analyze_binary(file: UploadFile = File(...), force_deep: bool = False)
             os.unlink(tmp_path)
         except Exception:
             pass
+        
+        # Force garbage collection after analysis to free memory
+        gc.collect()
+        logger.debug("🧹 Garbage collection completed")

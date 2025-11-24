@@ -4,6 +4,7 @@ Main application file for the FastAPI server.
 """
 
 import os
+import gc
 import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -25,6 +26,11 @@ logging.getLogger('angr').setLevel(logging.CRITICAL)
 logging.getLogger('cle').setLevel(logging.CRITICAL)
 logging.getLogger('pyvex').setLevel(logging.CRITICAL)
 logging.getLogger('cle.backends.macho').setLevel(logging.CRITICAL)
+
+# Memory optimization for low-memory instances (512MB)
+gc_threshold = int(os.getenv('GC_THRESHOLD', '50'))
+gc.set_threshold(gc_threshold, 5, 5)  # More aggressive garbage collection
+logger.info(f"🧹 Garbage collection threshold: {gc_threshold}")
 
 # Check critical environment variables
 openai_api_key = os.getenv('OPENAI_API_KEY')
