@@ -29,6 +29,8 @@ logging.getLogger('cle.backends.macho').setLevel(logging.CRITICAL)
 # Check critical environment variables
 openai_api_key = os.getenv('OPENAI_API_KEY')
 anthropic_api_key = os.getenv('ANTHROPIC_API_KEY') or os.getenv('ANTRHOPIC_API_KEY')
+environment = os.getenv('ENVIRONMENT', 'development')
+log_level = os.getenv('LOG_LEVEL', 'INFO')
 
 if not openai_api_key:
     logger.error("Primary AI API key not found in environment variables!")
@@ -51,14 +53,17 @@ app = FastAPI(
     title="CypherRay - Cryptographic Binary Analysis System",
     description="AI-powered cryptographic algorithm detection and binary analysis using multi-model orchestration",
     version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url="/docs" if environment != "production" else None,
+    redoc_url="/redoc" if environment != "production" else None
 )
 
-# CORS middleware
+# CORS middleware - configurable origins
+cors_origins_str = os.getenv('CORS_ORIGINS', '*')
+cors_origins = cors_origins_str.split(',') if cors_origins_str != '*' else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -90,6 +95,9 @@ async def startup_event():
     logger.info("=" * 60)
     logger.info("CYPHERRAY ML SERVICE STARTING")
     logger.info("=" * 60)
+    logger.info(f"Environment: {environment}")
+    logger.info(f"Log Level: {log_level}")
+    logger.info(f"CORS Origins: {cors_origins}")
     logger.info(f"Primary AI: {'✅ Configured' if openai_api_key else '❌ Missing'}")
     logger.info(f"Secondary AI: {'✅ Configured' if anthropic_api_key else '⚠️ Not configured'}")
     logger.info(f"Angr: {'✅ Available' if check_angr_available() else '❌ Not available'}")

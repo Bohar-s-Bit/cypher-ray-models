@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "```json\n[\n  {\n    \"protocol\": \"TLS\",\n    \"version\": \"1.2\",\n    \"confidence\": 0.9,\n    \"evidence\": [\n      \"String '[PROTOCOL] TLS ClientHello'\",\n      \"String '[PROTOCOL] Cipher Suite: TLS_DHE_RSA_WITH_AES_256_GCM_SHA384'\",\n      \"String '[PROTOCOL] TLS Key Exchange using DHE'\",\n      \"String '--- Test 7: TLS Protocol Handshake ---'\",\n      \"String '  - TLS 1.2 Protocol'\"\n    ],\n    \"cipher_suites\": [\n      \"TLS_DHE_RSA_WITH_AES_256_GCM_SHA384\"\n    ],\n    \"implementation_status\": \"complete\",\n    \"security_notes\": \"TLS 1.2 is secure when configured properly with modern cipher suites. Ensure no deprecated algorithms like MD5 are used.\"\n  }\n]\n```",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "usage": {
+      "input_tokens": 7269,
+      "output_tokens": 182,
+      "total_tokens": 7451
+    },
+    "cost": 0.0199925,
+    "duration": 2.557047128677368
+  },
+  "timestamp": 1763825373.777282,
+  "ttl": 86400,
+  "created_at": "2025-11-22T20:59:33.777283"
+}
