@@ -1,0 +1,183 @@
+{
+  "protocols": {
+    "TLS_1.2": {
+      "name": "TLS 1.2",
+      "type": "encryption_protocol",
+      "handshake_sequence": [
+        "ClientHello",
+        "ServerHello",
+        "Certificate",
+        "ServerKeyExchange",
+        "ServerHelloDone",
+        "ClientKeyExchange",
+        "ChangeCipherSpec",
+        "Finished"
+      ],
+      "characteristic_constants": ["0x0303", "0x0301"],
+      "required_operations": [
+        "key_exchange",
+        "certificate_verification",
+        "symmetric_encryption",
+        "hmac"
+      ],
+      "confidence_threshold": 0.8
+    },
+    "TLS_1.3": {
+      "name": "TLS 1.3",
+      "type": "encryption_protocol",
+      "handshake_sequence": [
+        "ClientHello",
+        "ServerHello",
+        "EncryptedExtensions",
+        "Certificate",
+        "CertificateVerify",
+        "Finished"
+      ],
+      "characteristic_constants": ["0x0304"],
+      "required_operations": ["ecdhe_key_exchange", "hkdf", "aead_encryption"],
+      "confidence_threshold": 0.8
+    },
+    "SSH": {
+      "name": "SSH Protocol",
+      "type": "secure_shell",
+      "handshake_sequence": [
+        "ProtocolVersionExchange",
+        "KeyExchangeInit",
+        "DiffieHellmanExchange",
+        "NewKeys",
+        "ServiceRequest"
+      ],
+      "characteristic_strings": ["SSH-2.0", "diffie-hellman"],
+      "required_operations": [
+        "dh_key_exchange",
+        "symmetric_encryption",
+        "hmac",
+        "public_key_auth"
+      ],
+      "confidence_threshold": 0.75
+    },
+    "IPSEC": {
+      "name": "IPSec",
+      "type": "vpn_protocol",
+      "phases": [
+        {
+          "name": "IKE Phase 1",
+          "operations": ["dh_exchange", "authentication", "sa_establishment"]
+        },
+        {
+          "name": "IKE Phase 2",
+          "operations": ["ipsec_sa_negotiation", "key_refresh"]
+        }
+      ],
+      "required_operations": [
+        "esp_encryption",
+        "ah_authentication",
+        "key_derivation"
+      ],
+      "confidence_threshold": 0.7
+    },
+    "OAuth2": {
+      "name": "OAuth 2.0",
+      "type": "authorization_protocol",
+      "flow_sequence": [
+        "AuthorizationRequest",
+        "AuthorizationGrant",
+        "TokenRequest",
+        "TokenResponse"
+      ],
+      "characteristic_strings": ["access_token", "refresh_token", "bearer"],
+      "required_operations": [
+        "jwt_validation",
+        "signature_verification",
+        "token_generation"
+      ],
+      "confidence_threshold": 0.6
+    },
+    "Custom_Authentication": {
+      "name": "Custom Authentication Protocol",
+      "type": "authentication",
+      "common_patterns": [
+        {
+          "name": "Challenge-Response",
+          "sequence": [
+            "generate_nonce",
+            "send_challenge",
+            "compute_response",
+            "verify_response"
+          ],
+          "confidence": 0.65
+        },
+        {
+          "name": "Token-Based",
+          "sequence": [
+            "generate_token",
+            "encrypt_token",
+            "send_token",
+            "verify_token"
+          ],
+          "confidence": 0.6
+        }
+      ]
+    }
+  },
+  "protocol_indicators": {
+    "network_communication": {
+      "function_names": [
+        "connect",
+        "send",
+        "recv",
+        "socket",
+        "bind",
+        "listen",
+        "SSL_connect",
+        "SSL_write",
+        "SSL_read"
+      ],
+      "confidence_boost": 0.3
+    },
+    "key_exchange": {
+      "patterns": ["diffie_hellman", "ecdh", "rsa_key_exchange"],
+      "confidence_boost": 0.4
+    },
+    "session_management": {
+      "keywords": [
+        "session",
+        "handshake",
+        "negotiate",
+        "establish",
+        "cipher_suite",
+        "key_schedule"
+      ],
+      "confidence_boost": 0.2
+    }
+  },
+  "state_machine_patterns": {
+    "typical_crypto_protocol": {
+      "states": [
+        "INIT",
+        "KEY_EXCHANGE",
+        "AUTHENTICATED",
+        "ENCRYPTED_COMMUNICATION",
+        "TERMINATION"
+      ],
+      "transitions": [
+        { "from": "INIT", "to": "KEY_EXCHANGE", "trigger": "hello_message" },
+        {
+          "from": "KEY_EXCHANGE",
+          "to": "AUTHENTICATED",
+          "trigger": "auth_complete"
+        },
+        {
+          "from": "AUTHENTICATED",
+          "to": "ENCRYPTED_COMMUNICATION",
+          "trigger": "cipher_ready"
+        },
+        {
+          "from": "ENCRYPTED_COMMUNICATION",
+          "to": "TERMINATION",
+          "trigger": "close_notify"
+        }
+      ]
+    }
+  }
+}
