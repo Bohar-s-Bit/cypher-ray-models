@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "```json\n[]\n```",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "usage": {
+      "input_tokens": 3907,
+      "output_tokens": 5,
+      "total_tokens": 3912
+    },
+    "cost": 0.0098175,
+    "duration": 0.9148621559143066
+  },
+  "timestamp": 1764091254.3109288,
+  "ttl": 86400,
+  "created_at": "2025-11-25T22:50:54.310929"
+}

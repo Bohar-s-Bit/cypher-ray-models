@@ -104,6 +104,8 @@ Now classify this binary according to the instructions above. Respond ONLY with 
         from src.tools.angr_functions import angr_extract_functions
         from src.tools.angr_strings import angr_analyze_strings
         from src.tools.angr_constants import angr_detect_crypto_constants
+        from src.tools.angr_patterns import angr_detect_crypto_patterns
+        from src.tools.angr_dataflow import angr_analyze_dataflow
         
         results = {}
         
@@ -131,13 +133,74 @@ Now classify this binary according to the instructions above. Respond ONLY with 
             logger.error(f"String analysis failed: {e}")
             results['strings'] = {}
         
-        # Detect constants
+        # Detect constants (ENHANCED)
         try:
             results['constants'] = angr_detect_crypto_constants(binary_path)
-            logger.info(f"✅ Found {len(results['constants'].get('detected_constants', []))} crypto constants")
+            const_count = len(results['constants'].get('detected_constants', []))
+            logger.info(f"✅ Found {const_count} crypto constants")
+            if results['constants'].get('algorithm_groups'):
+                logger.info(f"   Algorithm hints: {list(results['constants']['algorithm_groups'].keys())}")
         except Exception as e:
             logger.error(f"Constant detection failed: {e}")
             results['constants'] = {}
+        
+        # Detect crypto patterns (NEW)
+        try:
+            logger.info("Starting crypto pattern detection...")
+            results['patterns'] = angr_detect_crypto_patterns(binary_path)
+            pattern_summary = results['patterns'].get('pattern_summary', {})
+            logger.info(f"✅ Pattern detection complete")
+            logger.info(f"   Round loops: {pattern_summary.get('round_loops_found', 0)}")
+            logger.info(f"   ARX operations: {pattern_summary.get('arx_operations_found', 0)}")
+            logger.info(f"   Table lookups: {pattern_summary.get('table_lookups_found', 0)}")
+            
+            if results['patterns'].get('inferred_algorithms'):
+                logger.info(f"   Inferred algorithms: {[a['algorithm'] for a in results['patterns']['inferred_algorithms'][:3]]}")
+            else:
+                logger.warning("   ⚠️  No algorithms inferred from patterns")
+        except Exception as e:
+            logger.error(f"❌ Pattern detection failed: {e}", exc_info=True)
+            results['patterns'] = {"error": str(e)}
+        
+        # Analyze data flow (NEW)
+        try:
+            logger.info("Starting dataflow analysis...")
+            results['dataflow'] = angr_analyze_dataflow(binary_path)
+            dataflow_summary = results['dataflow'].get('summary', {})
+            crypto_score = results['dataflow'].get('crypto_likelihood_score', 0)
+            logger.info(f"✅ Dataflow analysis complete")
+            logger.info(f"   XOR chains: {dataflow_summary.get('xor_chains_found', 0)}")
+            logger.info(f"   Bit rotations: {dataflow_summary.get('rotations_found', 0)}")
+            logger.info(f"   Crypto likelihood: {crypto_score:.2f}")
+            
+            if crypto_score < 0.3:
+                logger.warning(f"   ⚠️  Low crypto likelihood score: {crypto_score:.2f}")
+        except Exception as e:
+            logger.error(f"❌ Dataflow analysis failed: {e}", exc_info=True)
+            results['dataflow'] = {"error": str(e)}
+        
+        # Build function groups for cross-function aggregation (NEW for stripped binaries)
+        try:
+            logger.info("Building function call graph for aggregation...")
+            from src.tools.angr_patterns import angr_build_function_groups
+            results['function_groups'] = angr_build_function_groups(binary_path)
+            group_count = results['function_groups'].get('total_groups', 0)
+            largest_group = results['function_groups'].get('largest_group_size', 0)
+            logger.info(f"✅ Found {group_count} function groups (largest: {largest_group} functions)")
+            
+            # Aggregate patterns across function groups
+            if group_count > 0:
+                aggregated_score = self._aggregate_patterns_across_groups(
+                    results['patterns'],
+                    results['dataflow'],
+                    results['function_groups']
+                )
+                results['aggregated_crypto_score'] = aggregated_score
+                logger.info(f"   Aggregated crypto score: {aggregated_score:.2f}")
+        except Exception as e:
+            logger.error(f"❌ Function group analysis failed: {e}", exc_info=True)
+            results['function_groups'] = {"error": str(e)}
+
         
         return results
     
@@ -425,6 +488,7 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         """
         logger.info("="*60)
         logger.info(f"Starting MODULAR analysis pipeline for: {filename}")
+        logger.info(f"Force deep analysis: {force_deep}")
         logger.info("="*60)
         
         total_cost = 0.0
@@ -432,6 +496,7 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         
         # Stage 1: Quick triage (unless forced deep)
         if not force_deep:
+            logger.info("Stage 1: Quick triage for " + filename)
             triage = await self.run_quick_triage(binary_path, filename)
             total_cost += triage.get('stage1_cost', 0)
             stage_results['triage'] = triage
@@ -445,6 +510,7 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
                     "total_cost": total_cost
                 }
         else:
+            logger.info("🚀 FORCE_DEEP enabled - Skipping triage, running full analysis")
             stage_results['triage'] = {"recommended_analysis": "deep"}
         
         # Stage 2: Angr extraction
@@ -503,9 +569,10 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         2. Limit function list to top 50 (most relevant)
         3. Keep only crypto-related strings
         4. Summarize large constant arrays
+        5. **NEW**: Include aggregated crypto score and function groups (Phase 2.5)
         
         Returns:
-            Optimized data structure with preserved metadata
+            Optimized data structure with preserved metadata + aggregation
         """
         optimized = {}
         
@@ -536,6 +603,20 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         if 'constants' in angr_results:
             optimized['constants'] = angr_results['constants']
         
+        # **PHASE 2.5: Include aggregated crypto score + function groups**
+        # This is CRITICAL for ultra-stripped binaries where functions are inlined/scattered
+        if 'aggregated_crypto_score' in angr_results:
+            optimized['aggregated_crypto_score'] = angr_results['aggregated_crypto_score']
+            logger.info(f"✅ Included aggregated_crypto_score: {angr_results['aggregated_crypto_score']:.2f}")
+        
+        if 'function_groups' in angr_results:
+            optimized['function_groups'] = angr_results['function_groups']
+            logger.info(f"✅ Included {len(angr_results['function_groups'])} function groups")
+        
+        # Base crypto likelihood (for comparison)
+        if 'crypto_likelihood_score' in angr_results:
+            optimized['base_crypto_score'] = angr_results['crypto_likelihood_score']
+        
         return optimized
     
     def _load_prompt(self, prompt_path: str) -> str:
@@ -555,6 +636,64 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         else:
             logger.warning(f"Prompt file not found: {prompt_path}")
             return "You are CypherRay, a cryptographic binary analysis expert."
+    
+    def _aggregate_patterns_across_groups(
+        self, 
+        patterns: Dict[str, Any], 
+        dataflow: Dict[str, Any],
+        function_groups: Dict[str, Any]
+    ) -> float:
+        """
+        Aggregate crypto patterns across function groups to boost score for stripped binaries.
+        
+        CRITICAL for ultra-stripped binaries where crypto is split across 10-40 tiny functions.
+        
+        Args:
+            patterns: Pattern detection results (ARX, table lookups, etc.)
+            dataflow: Dataflow analysis results (XOR chains, rotations)
+            function_groups: Call graph function groups
+            
+        Returns:
+            Aggregated crypto likelihood score (0.0 - 1.0)
+        """
+        base_score = dataflow.get('crypto_likelihood_score', 0.0)
+        
+        # Get total pattern counts
+        total_arx = len(patterns.get('patterns', {}).get('arx_operations', []))
+        total_tables = len(patterns.get('patterns', {}).get('table_lookups', []))
+        total_xor = len(dataflow.get('dataflow_patterns', {}).get('xor_chains', []))
+        total_rotations = len(dataflow.get('dataflow_patterns', {}).get('bit_rotations', []))
+        
+        # Get largest function group size
+        largest_group = function_groups.get('largest_group_size', 0)
+        total_groups = function_groups.get('total_groups', 0)
+        
+        # Aggregation bonuses
+        bonus = 0.0
+        
+        # Bonus 1: Large function groups suggest complex crypto implementation
+        if largest_group >= 10:
+            bonus += 0.25  # Strong signal
+        elif largest_group >= 5:
+            bonus += 0.15
+        
+        # Bonus 2: Many pattern matches across groups (even if weak individually)
+        total_patterns = total_arx + total_tables + total_xor + total_rotations
+        if total_patterns >= 15:
+            bonus += 0.20
+        elif total_patterns >= 10:
+            bonus += 0.10
+        
+        # Bonus 3: Multiple groups with patterns (distributed crypto)
+        if total_groups >= 5 and total_patterns >= 5:
+            bonus += 0.15
+        
+        aggregated = min(base_score + bonus, 1.0)
+        
+        logger.info(f"   Aggregation: base={base_score:.2f} + bonus={bonus:.2f} = {aggregated:.2f}")
+        logger.info(f"   Evidence: {total_patterns} patterns across {total_groups} groups (largest: {largest_group} funcs)")
+        
+        return aggregated
     
     def _parse_json_response(self, content: str) -> Any:
         """

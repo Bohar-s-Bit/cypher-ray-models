@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "```json\n[\n  {\n    \"name\": \"AES\",\n    \"type\": \"symmetric\",\n    \"confidence\": 0.95,\n    \"evidence\": [\n      \"AES S-box constants found at offset 0x1000012b0\",\n      \"AES RCON constants found at offset 0x1000013b0\"\n    ],\n    \"functions\": [\n      \"__u0\",\n      \"_main\"\n    ],\n    \"locations\": [\n      \"0x100000460\",\n      \"0x100000b84\"\n    ],\n    \"is_proprietary\": false,\n    \"standard_library\": null\n  }\n]\n```",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "usage": {
+      "input_tokens": 8399,
+      "output_tokens": 134,
+      "total_tokens": 8533
+    },
+    "cost": 0.0223375,
+    "duration": 2.1212170124053955
+  },
+  "timestamp": 1764091279.349407,
+  "ttl": 86400,
+  "created_at": "2025-11-25T22:51:19.349408"
+}
