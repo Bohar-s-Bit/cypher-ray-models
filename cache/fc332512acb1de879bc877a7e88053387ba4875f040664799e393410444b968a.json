@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "```json\n[\n  {\n    \"name\": \"ChaCha20/Salsa20/BLAKE2\",\n    \"type\": \"symmetric\",\n    \"confidence\": 0.65,\n    \"evidence\": [\n      \"ARX pattern detected (ADD:93, XOR:83, ROT:110)\"\n    ],\n    \"functions\": [\"_main\"],\n    \"locations\": [\"0x100000460\"],\n    \"is_proprietary\": false,\n    \"standard_library\": null\n  },\n  {\n    \"name\": \"AES or DES (S-box based cipher)\",\n    \"type\": \"symmetric\",\n    \"confidence\": 0.8,\n    \"evidence\": [\n      \"S-box pattern with 93 table accesses\"\n    ],\n    \"functions\": [\"_main\"],\n    \"locations\": [\"0x100000460\"],\n    \"is_proprietary\": false,\n    \"standard_library\": null\n  },\n  {\n    \"name\": \"RSA or ECC\",\n    \"type\": \"asymmetric\",\n    \"confidence\": 0.75,\n    \"evidence\": [\n      \"Modular arithmetic (MUL:35, DIV:7, SHIFT:19)\"\n    ],\n    \"functions\": [\"_main\"],\n    \"locations\": [\"0x100000460\"],\n    \"is_proprietary\": false,\n    \"standard_library\": null\n  },\n  {\n    \"name\": \"SHA-256\",\n    \"type\": \"hash\",\n    \"confidence\": 0.85,\n    \"evidence\": [\n      \"Hash constants detected: [1732584193, 3921009573, 4023233417, 2600822924, 3049323471, 3285377520, 1899447441, 1116352408, 3905402710, 271733878, 3614090360, 606105819, 2562383102]\"\n    ],\n    \"functions\": [\"_main\", \"sub_100001554\", \"sub_100001384\", \"sub_10000138c\", \"sub_100001398\", \"sub_1000013d8\", \"sub_1000013f0\", \"sub_100001408\", \"sub_100001430\", \"sub_100001454\", \"sub_10000145c\", \"sub_100001464\", \"sub_100001470\", \"sub_10000147c\", \"sub_10000148c\", \"sub_100001498\", \"sub_1000014a0\", \"sub_1000014ac\", \"sub_1000014b8\", \"sub_1000014d8\", \"sub_1000014e0\", \"sub_1000014e8\", \"sub_1000014f0\", \"sub_100001504\", \"sub_10000150c\", \"sub_100001524\", \"sub_100001544\", \"sub_10000154c\"],\n    \"locations\": [\"0x100000460\", \"0x100001554\", \"0x100001384\", \"0x10000138c\", \"0x100001398\", \"0x1000013d8\", \"0x1000013f0\", \"0x100001408\", \"0x100001430\", \"0x100001454\", \"0x10000145c\", \"0x100001464\", \"0x100001470\", \"0x10000147c\", \"0x10000148c\", \"0x100001498\", \"0x1000014a0\", \"0x1000014ac\", \"0x1000014b8\", \"0x1000014d8\", \"0x1000014e0\", \"0x1000014e8\", \"0x1000014f0\", \"0x100001504\", \"0x10000150c\", \"0x100001524\", \"0x100001544\", \"0x10000154c\"],\n    \"is_proprietary\": false,\n    \"standard_library\": null\n  }\n]\n```",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "usage": {
+      "input_tokens": 17264,
+      "output_tokens": 864,
+      "total_tokens": 18128
+    },
+    "cost": 0.0518,
+    "duration": 6.649163007736206
+  },
+  "timestamp": 1764243525.6395142,
+  "ttl": 86400,
+  "created_at": "2025-11-27T17:08:45.639515"
+}

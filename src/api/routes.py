@@ -7,7 +7,7 @@ import gc
 import json
 import tempfile
 import traceback
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 from openai import OpenAI
 
 from src.api.models import AnalysisResponse, HealthResponse
@@ -201,7 +201,7 @@ Respond in JSON format:
 
 
 @router.post("/analyze", tags=["Analysis"])
-async def analyze_binary(file: UploadFile = File(...), force_deep: bool = False):
+async def analyze_binary(file: UploadFile = File(...), force_deep: bool = Form(False)):
     """
     🚀 Analyze binary executable using intelligent multi-stage pipeline.
     
@@ -225,7 +225,7 @@ async def analyze_binary(file: UploadFile = File(...), force_deep: bool = False)
     
     # Read file
     file_content = await file.read()
-    logger.info(f"Smart analysis for: {file.filename} ({len(file_content)} bytes)")
+    logger.info(f"Smart analysis for: {file.filename} ({len(file_content)} bytes) [force_deep={force_deep}]")
     
     if len(file_content) == 0:
         raise HTTPException(status_code=400, detail="Empty file uploaded")

@@ -15,6 +15,9 @@ from src.utils.logger import get_logger
 from src.utils.cost_tracker import CostTracker
 from src.utils.cache_manager import CacheManager
 
+# Analysis version - increment when detection logic changes (invalidates cache)
+ANALYSIS_VERSION = "v4.1-json-safety-reduced-logs"
+
 logger = get_logger(__name__)
 
 
@@ -51,7 +54,7 @@ class MultiModelOrchestrator:
     
     def _generate_cache_key(self, query: str, context: Dict, analysis_type: str) -> str:
         """Generate a unique cache key for the query."""
-        combined = f"{query}:{json.dumps(context, sort_keys=True)}:{analysis_type}"
+        combined = f"{ANALYSIS_VERSION}:{query}:{json.dumps(context, sort_keys=True)}:{analysis_type}"
         return hashlib.sha256(combined.encode()).hexdigest()
     
     def _get_cached_response(self, cache_key: str) -> Optional[Dict]:

@@ -6,8 +6,9 @@ from typing import Dict, Any, Callable
 from src.tools.angr_metadata import angr_analyze_binary_metadata
 from src.tools.angr_functions import angr_extract_functions
 from src.tools.angr_strings import angr_analyze_strings
-from src.tools.angr_dataflow import angr_analyze_function_dataflow
+from src.tools.angr_dataflow import angr_analyze_dataflow
 from src.tools.angr_constants import angr_detect_crypto_constants
+from src.tools.angr_patterns import angr_detect_crypto_patterns, angr_build_function_groups
 
 
 # Tool definitions for OpenAI function calling
@@ -71,26 +72,34 @@ ANGR_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "angr_analyze_function_dataflow",
-            "description": "Analyze data flow patterns in a specific function to detect cryptographic operation patterns (XOR loops, rotations, S-box lookups). Call this on suspicious functions.",
+            "name": "angr_analyze_dataflow",
+            "description": "Analyze data flow patterns across the entire binary to detect cryptographic operations (XOR chains, bit rotations, data mixing). Detects ARX ciphers, SPN structures, and crypto likelihood.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "binary_path": {
                         "type": "string",
                         "description": "Path to the binary file"
-                    },
-                    "function_address": {
-                        "type": "string",
-                        "description": "Hexadecimal address of the function to analyze (e.g., '0x401000')"
-                    },
-                    "max_depth": {
-                        "type": "integer",
-                        "description": "Maximum number of basic blocks to analyze (default: 20)",
-                        "default": 20
                     }
                 },
-                "required": ["binary_path", "function_address"]
+                "required": ["binary_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "angr_detect_crypto_patterns",
+            "description": "Detect cryptographic patterns through control flow analysis: round loops, ARX operations, Feistel networks, SPN structures, table lookups. Infers algorithms from structural patterns even without constants.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "binary_path": {
+                        "type": "string",
+                        "description": "Path to the binary file"
+                    }
+                },
+                "required": ["binary_path"]
             }
         }
     },
@@ -118,8 +127,10 @@ ANGR_FUNCTION_MAP: Dict[str, Callable] = {
     "angr_analyze_binary_metadata": angr_analyze_binary_metadata,
     "angr_extract_functions": angr_extract_functions,
     "angr_analyze_strings": angr_analyze_strings,
-    "angr_analyze_function_dataflow": angr_analyze_function_dataflow,
-    "angr_detect_crypto_constants": angr_detect_crypto_constants
+    "angr_analyze_dataflow": angr_analyze_dataflow,
+    "angr_detect_crypto_patterns": angr_detect_crypto_patterns,
+    "angr_detect_crypto_constants": angr_detect_crypto_constants,
+    "angr_build_function_groups": angr_build_function_groups  # NEW: Call graph aggregation
 }
 
 
