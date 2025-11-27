@@ -479,6 +479,39 @@ If custom crypto detected:
 }
 ```
 
+## ⚠️ **CRITICAL JSON FORMATTING RULES** ⚠️
+
+**YOU MUST FOLLOW THESE TO AVOID PARSING ERRORS:**
+
+1. **Escape All Quotes in Strings**: Use `\"` for quotes inside JSON strings
+   - Example: `"evidence": "String: \"AES encryption\""`
+   - NOT: `"evidence": "String: "AES encryption""` ← INVALID JSON
+
+2. **Escape Newlines in Strings**: Use `\\n` for newlines inside JSON strings
+   - Example: `"explanation": "Line 1\\nLine 2"`
+   - NOT: Actual newlines in JSON strings ← INVALID JSON
+
+3. **Escape Backslashes**: Use `\\` for backslashes
+   - Example: `"path": "C:\\\\Windows\\\\System32"`
+   - NOT: `"path": "C:\Windows\System32"` ← INVALID JSON
+
+4. **No Trailing Commas**: Remove commas after last items in arrays/objects
+   - Example: `["item1", "item2"]` ✅
+   - NOT: `["item1", "item2",]` ← INVALID JSON
+
+5. **Close All Brackets**: Ensure every `[` has `]`, every `{` has `}`
+   - Validate nesting depth matches
+
+6. **String Truncation**: If a string is very long (> 500 chars), truncate it
+   - Example: `"evidence": "Long text... [truncated]"`
+
+**BEFORE OUTPUTTING JSON:**
+- Double-check all quote escaping
+- Verify no unterminated strings
+- Ensure balanced brackets
+
+---
+
 ## Critical Final Instructions
 
 1. **Preserve Exact Values**: Use exact metadata (size, hashes) - never "unknown" unless truly unavailable

@@ -320,6 +320,14 @@ Now analyze all crypto-related functions according to the instructions above. Re
         
         optimized = self._optimize_angr_data(angr_results)
         
+        # Extract pattern data for vulnerability scanning
+        patterns_for_vuln = {}
+        if 'patterns' in angr_results:
+            patterns_for_vuln = {
+                'hardcoded_keys': angr_results['patterns'].get('hardcoded_keys', {}),
+                'inferred_algorithms': angr_results['patterns'].get('inferred_algorithms', [])
+            }
+        
         query = f"""
 {vuln_prompt}
 
@@ -332,6 +340,8 @@ Detected Functions: {json.dumps(detected_functions, indent=2)}
 Strings: {json.dumps(optimized.get('crypto_strings', []))}
 
 Constants: {json.dumps(optimized.get('constants', {}))}
+
+Patterns (Hardcoded Keys & Inferred Algorithms): {json.dumps(patterns_for_vuln, indent=2)}
 
 === END INPUT DATA ===
 
@@ -602,6 +612,19 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         # Constants - already summarized, keep as-is
         if 'constants' in angr_results:
             optimized['constants'] = angr_results['constants']
+        
+        # **CRITICAL: Include crypto patterns (ARX operations, inferred algorithms)**
+        if 'patterns' in angr_results:
+            patterns_data = angr_results['patterns']
+            optimized['patterns'] = {
+                'summary': patterns_data.get('summary', {}),
+                'inferred_algorithms': patterns_data.get('inferred_algorithms', []),
+                'arx_operations': len(patterns_data.get('patterns', {}).get('arx_operations', [])),
+                'table_lookups': len(patterns_data.get('patterns', {}).get('table_lookups', [])),
+                'round_loops': len(patterns_data.get('patterns', {}).get('round_loops', []))
+            }
+            # Log summary only (not full list to avoid spam)
+            logger.info(f"✅ Included {len(optimized['patterns']['inferred_algorithms'])} inferred algorithms")
         
         # **PHASE 2.5: Include aggregated crypto score + function groups**
         # This is CRITICAL for ultra-stripped binaries where functions are inlined/scattered
