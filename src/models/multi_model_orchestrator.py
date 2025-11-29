@@ -16,7 +16,7 @@ from src.utils.cost_tracker import CostTracker
 from src.utils.cache_manager import CacheManager
 
 # Analysis version - increment when detection logic changes (invalidates cache)
-ANALYSIS_VERSION = "v4.1-json-safety-reduced-logs"
+ANALYSIS_VERSION = "v4.2-robust-json-parser-strict-validation"
 
 logger = get_logger(__name__)
 

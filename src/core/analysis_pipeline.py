@@ -4,6 +4,7 @@ Intelligent multi-stage analysis using cost-optimized model selection.
 """
 
 import json
+import time
 import tempfile
 import os
 from typing import Dict, Any, List
@@ -465,7 +466,10 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
             analysis_type='main_analysis'
         )
         
-        final_report = self._parse_json_response(result['content'])
+        try:
+            final_report = self._parse_json_response(result['content'])
+        except json.JSONDecodeError as e:
+            # Log the malformed JSON for debugging\n            logger.error(f\"❌ JSON parsing failed in final synthesis: {e}\")\n            logger.error(f\"Content preview (first 500 chars): {result['content'][:500]}\")\n            logger.error(f\"Content preview (around error char {e.pos}): {result['content'][max(0, e.pos-100):min(len(result['content']), e.pos+100)]}\")\n            \n            # Save to file for detailed debugging\n            error_file = f\"logs/json_parse_error_{int(time.time())}.txt\"\n            try:\n                with open(error_file, 'w') as f:\n                    f.write(f\"JSON Parsing Error:\\n{e}\\n\\n\")\n                    f.write(f\"Full Content:\\n{result['content']}\")\n                logger.error(f\"Full malformed JSON saved to: {error_file}\")\n            except Exception as write_error:\n                logger.error(f\"Could not save error file: {write_error}\")\n            \n            # Re-raise with more context\n            raise ValueError(f\"Final synthesis JSON parsing failed at position {e.pos}: {e.msg}\") from e
         
         # Add analysis metadata
         final_report['_analysis_metadata'] = {
@@ -720,7 +724,13 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
     
     def _parse_json_response(self, content: str) -> Any:
         """
-        Parse JSON from LLM response, handling markdown code blocks.
+        Parse JSON from LLM response with multiple repair strategies.
+        
+        Strategies:
+        1. Direct parsing
+        2. Extract from markdown code blocks
+        3. Repair common JSON errors (trailing commas, unescaped quotes)
+        4. Regex extraction as last resort
         
         Args:
             content: LLM response content
@@ -728,15 +738,59 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         Returns:
             Parsed JSON object
         """
+        import re
+        
+        # Strategy 1: Direct parsing
         try:
             return json.loads(content)
-        except json.JSONDecodeError:
-            # Try extracting from code blocks
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
-            return json.loads(content)
+        except json.JSONDecodeError as e:
+            logger.warning(f"Direct JSON parse failed: {e}")
+        
+        # Strategy 2: Extract from markdown code blocks
+        cleaned_content = content
+        if "```json" in content:
+            cleaned_content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            cleaned_content = content.split("```")[1].split("```")[0].strip()
+        
+        try:
+            return json.loads(cleaned_content)
+        except json.JSONDecodeError as e:
+            logger.warning(f"Markdown extraction failed: {e}")
+        
+        # Strategy 3: Repair common JSON errors
+        try:
+            repaired = cleaned_content
+            
+            # Remove trailing commas before closing brackets/braces
+            repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
+            
+            # Fix common quote escaping issues in property names
+            # Replace unescaped quotes in values (heuristic: after colons)
+            repaired = re.sub(r':\s*"([^"]*?)"([^"]*?)"([^,}\]]*?)"', r': "\1\'\2\'\3"', repaired)
+            
+            return json.loads(repaired)
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON repair failed: {e}")
+        
+        # Strategy 4: Regex extraction (last resort)
+        try:
+            # Try to find a valid JSON object
+            json_match = re.search(r'\{[\s\S]*\}', cleaned_content)
+            if json_match:
+                potential_json = json_match.group(0)
+                # One more repair attempt
+                potential_json = re.sub(r',\s*([}\]])', r'\1', potential_json)
+                return json.loads(potential_json)
+        except (json.JSONDecodeError, AttributeError) as e:
+            logger.error(f"All JSON parsing strategies failed: {e}")
+        
+        # If all else fails, raise the original error with helpful context
+        raise json.JSONDecodeError(
+            f"Failed to parse JSON after all repair strategies. Content preview: {content[:200]}...",
+            content,
+            0
+        )
 
 
 # Example usage

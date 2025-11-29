@@ -481,34 +481,64 @@ If custom crypto detected:
 
 ## ⚠️ **CRITICAL JSON FORMATTING RULES** ⚠️
 
-**YOU MUST FOLLOW THESE TO AVOID PARSING ERRORS:**
+**🚨 THESE ARE MANDATORY - PARSING WILL FAIL WITHOUT STRICT COMPLIANCE 🚨**
 
 1. **Escape All Quotes in Strings**: Use `\"` for quotes inside JSON strings
+
    - Example: `"evidence": "String: \"AES encryption\""`
    - NOT: `"evidence": "String: "AES encryption""` ← INVALID JSON
+   - **Common Error**: `"name": "AES S-Box "Rijndael""` ❌ → `"name": "AES S-Box \"Rijndael\""` ✅
 
 2. **Escape Newlines in Strings**: Use `\\n` for newlines inside JSON strings
+
    - Example: `"explanation": "Line 1\\nLine 2"`
    - NOT: Actual newlines in JSON strings ← INVALID JSON
 
 3. **Escape Backslashes**: Use `\\` for backslashes
+
    - Example: `"path": "C:\\\\Windows\\\\System32"`
    - NOT: `"path": "C:\Windows\System32"` ← INVALID JSON
 
 4. **No Trailing Commas**: Remove commas after last items in arrays/objects
+
    - Example: `["item1", "item2"]` ✅
    - NOT: `["item1", "item2",]` ← INVALID JSON
+   - **Check**: Before every `}` or `]`, ensure no comma immediately before
 
 5. **Close All Brackets**: Ensure every `[` has `]`, every `{` has `}`
+
    - Validate nesting depth matches
+   - Use JSON validator before responding
 
 6. **String Truncation**: If a string is very long (> 500 chars), truncate it
+
    - Example: `"evidence": "Long text... [truncated]"`
 
+7. **Property Names**: Always use double quotes for property names
+
+   - Example: `{"algorithm": "AES"}` ✅
+   - NOT: `{algorithm: "AES"}` ← INVALID JSON
+   - NOT: `{'algorithm': 'AES'}` ← INVALID JSON
+
+8. **No Comments**: JSON does not support comments
+   - NOT: `{"algo": "AES"} // detected in function` ← INVALID JSON
+
+**MANDATORY PRE-FLIGHT CHECK:**
+Before generating the response:
+
+1. Count opening `{` and closing `}` - must be equal
+2. Count opening `[` and closing `]` - must be equal
+3. Search for unescaped `"` inside string values - escape them
+4. Search for trailing commas before `}` or `]` - remove them
+5. Verify all property names use double quotes
+
 **BEFORE OUTPUTTING JSON:**
+
 - Double-check all quote escaping
 - Verify no unterminated strings
 - Ensure balanced brackets
+- Remove any trailing commas
+- Validate property names have double quotes
 
 ---
 
