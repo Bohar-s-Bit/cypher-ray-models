@@ -469,7 +469,23 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         try:
             final_report = self._parse_json_response(result['content'])
         except json.JSONDecodeError as e:
-            # Log the malformed JSON for debugging\n            logger.error(f\"❌ JSON parsing failed in final synthesis: {e}\")\n            logger.error(f\"Content preview (first 500 chars): {result['content'][:500]}\")\n            logger.error(f\"Content preview (around error char {e.pos}): {result['content'][max(0, e.pos-100):min(len(result['content']), e.pos+100)]}\")\n            \n            # Save to file for detailed debugging\n            error_file = f\"logs/json_parse_error_{int(time.time())}.txt\"\n            try:\n                with open(error_file, 'w') as f:\n                    f.write(f\"JSON Parsing Error:\\n{e}\\n\\n\")\n                    f.write(f\"Full Content:\\n{result['content']}\")\n                logger.error(f\"Full malformed JSON saved to: {error_file}\")\n            except Exception as write_error:\n                logger.error(f\"Could not save error file: {write_error}\")\n            \n            # Re-raise with more context\n            raise ValueError(f\"Final synthesis JSON parsing failed at position {e.pos}: {e.msg}\") from e
+            # Log the malformed JSON for debugging
+            logger.error(f"❌ JSON parsing failed in final synthesis: {e}")
+            logger.error(f"Content preview (first 500 chars): {result['content'][:500]}")
+            logger.error(f"Content preview (around error char {e.pos}): {result['content'][max(0, e.pos-100):min(len(result['content']), e.pos+100)]}")
+            
+            # Save to file for detailed debugging
+            error_file = f"logs/json_parse_error_{int(time.time())}.txt"
+            try:
+                with open(error_file, 'w') as f:
+                    f.write(f"JSON Parsing Error:\n{e}\n\n")
+                    f.write(f"Full Content:\n{result['content']}")
+                logger.error(f"Full malformed JSON saved to: {error_file}")
+            except Exception as write_error:
+                logger.error(f"Could not save error file: {write_error}")
+            
+            # Re-raise with more context
+            raise ValueError(f"Final synthesis JSON parsing failed at position {e.pos}: {e.msg}") from e
         
         # Add analysis metadata
         final_report['_analysis_metadata'] = {
