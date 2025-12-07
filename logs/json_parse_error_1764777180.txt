@@ -1,0 +1,374 @@
+JSON Parsing Error:
+Failed to parse JSON after all repair strategies. Content preview: ```json
+{
+  "file_metadata": {
+    "size": 51680,
+    "md5": "8d98176e1253d854c2f0664fde8f4185",
+    "sha256": "7146f35854004368b19636e4c9ed4bac6f029443b76dc26eb1d5cca9505ecf96",
+    "architecture": "...: line 1 column 1 (char 0)
+
+Full Content:
+```json
+{
+  "file_metadata": {
+    "size": 51680,
+    "md5": "8d98176e1253d854c2f0664fde8f4185",
+    "sha256": "7146f35854004368b19636e4c9ed4bac6f029443b76dc26eb1d5cca9505ecf96",
+    "architecture": "AARCH64",
+    "format": "Mach-O",
+    "stripped": false
+  },
+  "detected_algorithms": [
+    {
+      "name": "ChaCha20/Salsa20",
+      "type": "symmetric",
+      "confidence": 0.85,
+      "evidence": [
+        "ChaCha20 magic constant + ARX pattern (ADD:6, XOR:48, ROT:1)",
+        "ChaCha20 magic constant + ARX pattern (ADD:25, XOR:10, ROT:4)",
+        "ChaCha20 magic constant + ARX pattern (ADD:48, XOR:32, ROT:32)"
+      ],
+      "locations": [
+        "0x1000009f4",
+        "0x100000ecc",
+        "0x10000139c"
+      ]
+    },
+    {
+      "name": "AES-256",
+      "type": "symmetric",
+      "confidence": 0.8,
+      "evidence": [
+        "S-box pattern with 63 table accesses",
+        "AES S-box constants found (0x63, 0x7c, 0x77, 0x7b...)",
+        "Function _aes_ecb_encrypt at 0x1000009f4",
+        "String: '[CRYPTO] AES-256-ECB encryption starting...'"
+      ],
+      "locations": [
+        "0x1000009f4"
+      ]
+    },
+    {
+      "name": "SHA-256",
+      "type": "hash",
+      "confidence": 0.85,
+      "evidence": [
+        "Hash constants detected: [1116352408, 1899447441, 3921009573, 3049323471]",
+        "Function _main at 0x100001c04",
+        "String: '[CRYPTO] SHA-256 hashing %zu bytes...'"
+      ],
+      "locations": [
+        "0x100001c04"
+      ]
+    },
+    {
+      "name": "RSA-2048",
+      "type": "asymmetric",
+      "confidence": 0.65,
+      "evidence": [
+        "Modular arithmetic (MUL:4, DIV:0, SHIFT:3)",
+        "Function _rsa_encrypt at 0x1000012ec",
+        "String: '[CRYPTO] RSA-2048 encryption (using hardcoded key)...'"
+      ],
+      "locations": [
+        "0x1000012ec"
+      ]
+    },
+    {
+      "name": "HMAC-SHA256",
+      "type": "mac",
+      "confidence": 0.85,
+      "evidence": [
+        "Function _hmac_sha256 at 0x1000018e0",
+        "String: '[CRYPTO] HMAC-SHA256 for message authentication'"
+      ],
+      "locations": [
+        "0x1000018e0"
+      ]
+    },
+    {
+      "name": "PBKDF2",
+      "type": "kdf",
+      "confidence": 0.85,
+      "evidence": [
+        "Function _pbkdf2_derive_key at 0x100001af4",
+        "String: '[CRYPTO] PBKDF2 key derivation with HARDCODED salt'"
+      ],
+      "locations": [
+        "0x100001af4"
+      ]
+    },
+    {
+      "name": "MD5",
+      "type": "hash",
+      "confidence": 0.65,
+      "evidence": [
+        "Function _md5_hash_deprecated at 0x10000184c",
+        "String: '[CRYPTO] WARNING: Using deprecated MD5 hash'"
+      ],
+      "locations": [
+        "0x10000184c"
+      ]
+    }
+  ],
+  "detected_functions": [
+    {
+      "name": "_aes_ecb_encrypt",
+      "address": "0x1000009f4",
+      "crypto_operations": [
+        "substitute",
+        "permutation",
+        "xor",
+        "key_expansion"
+      ],
+      "explanation": "Implements AES-256 encryption in ECB mode, performing multiple rounds of substitution, permutation, and mixing operations using XOR and key expansion.",
+      "confidence": 0.95,
+      "related_algorithm": "AES-256"
+    },
+    {
+      "name": "_sha256_transform",
+      "address": "0x100000ecc",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "Implements the SHA-256 compression function, processing one 512-bit block through 64 rounds of mixing operations using rotation and addition.",
+      "confidence": 0.92,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "_rsa_encrypt",
+      "address": "0x1000012ec",
+      "crypto_operations": [
+        "modular_arithmetic"
+      ],
+      "explanation": "Performs RSA encryption using modular exponentiation with a hardcoded key, a core operation in RSA encryption.",
+      "confidence": 0.88,
+      "related_algorithm": "RSA-2048"
+    },
+    {
+      "name": "_chacha20_block",
+      "address": "0x10000139c",
+      "crypto_operations": [
+        "addition",
+        "xor",
+        "rotation"
+      ],
+      "explanation": "Generates a ChaCha20 block by performing ARX operations (addition, rotation, XOR) on the state, a core operation in ChaCha20 encryption.",
+      "confidence": 0.9,
+      "related_algorithm": "ChaCha20/Salsa20"
+    },
+    {
+      "name": "_chacha20_encrypt",
+      "address": "0x100001614",
+      "crypto_operations": [
+        "addition",
+        "xor",
+        "rotation"
+      ],
+      "explanation": "Encrypts data using the ChaCha20 stream cipher, applying ARX operations to generate a keystream for encryption.",
+      "confidence": 0.9,
+      "related_algorithm": "ChaCha20/Salsa20"
+    },
+    {
+      "name": "_md5_hash_deprecated",
+      "address": "0x10000184c",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "Computes an MD5 hash, using a series of compression and mixing operations. This function is marked as deprecated.",
+      "confidence": 0.75,
+      "related_algorithm": "MD5"
+    },
+    {
+      "name": "_hmac_sha256",
+      "address": "0x1000018e0",
+      "crypto_operations": [
+        "hash",
+        "xor"
+      ],
+      "explanation": "Computes an HMAC using SHA-256, combining a secret key with a message using XOR and hashing the result.",
+      "confidence": 0.9,
+      "related_algorithm": "HMAC-SHA256"
+    },
+    {
+      "name": "_pbkdf2_derive_key",
+      "address": "0x100001af4",
+      "crypto_operations": [
+        "hash",
+        "addition"
+      ],
+      "explanation": "Derives a cryptographic key using PBKDF2, applying a hash function iteratively with a hardcoded salt.",
+      "confidence": 0.9,
+      "related_algorithm": "PBKDF2"
+    }
+  ],
+  "detected_protocols": [
+    {
+      "protocol": "TLS",
+      "version": "1.2",
+      "confidence": 0.9,
+      "evidence": [
+        "String '[PROTOCOL] TLS ClientHello'",
+        "String '[PROTOCOL] Cipher Suite: TLS_DHE_RSA_WITH_AES_256_GCM_SHA384'",
+        "String '[PROTOCOL] TLS Key Exchange using DHE'",
+        "Detected Algorithms: AES-256, HMAC-SHA256, RSA-2048",
+        "Function _rsa_encrypt at 0x1000012ec"
+      ],
+      "cipher_suites": [
+        "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384"
+      ],
+      "implementation_status": "complete",
+      "security_notes": "TLS 1.2 is secure when configured properly with modern cipher suites"
+    }
+  ],
+  "vulnerabilities": [
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 16-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "16-byte key candidate at offset 0x100002358 in __TEXT,__const (likely AES-128 key or IV, entropy: 3.125)",
+      "extracted_value": "0303019e00000000",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 16-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "16-byte key candidate at offset 0x100002359 in __TEXT,__const (likely AES-128 key or IV, entropy: 3.125)",
+      "extracted_value": "03019e0000000053",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 32-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "32-byte key candidate at offset 0x100002366 in __TEXT,__const (likely AES-256 key or ChaCha20 key, entropy: 4.726409765557392)",
+      "extracted_value": "6563726574323032",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 32-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "32-byte key candidate at offset 0x100002367 in __TEXT,__const (likely AES-256 key or ChaCha20 key, entropy: 4.8125)",
+      "extracted_value": "6372657432303234",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 32-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "32-byte key candidate at offset 0x100002368 in __TEXT,__const (likely AES-256 key or ChaCha20 key, entropy: 4.8125)",
+      "extracted_value": "726574323032344b",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 32-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "32-byte key candidate at offset 0x100002369 in __TEXT,__const (likely AES-256 key or ChaCha20 key, entropy: 4.8125)",
+      "extracted_value": "6574323032344b65",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 32-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "32-byte key candidate at offset 0x10000236a in __TEXT,__const (likely AES-256 key or ChaCha20 key, entropy: 4.875)",
+      "extracted_value": "74323032344b6579",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 32-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "32-byte key candidate at offset 0x10000236b in __TEXT,__const (likely AES-256 key or ChaCha20 key, entropy: 4.875)",
+      "extracted_value": "323032344b657921",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 24-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "24-byte key candidate at offset 0x10000236c in __TEXT,__const (likely 3DES or AES-192 key, entropy: 4.501629167387823)",
+      "extracted_value": "3032344b65792140",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 24-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "24-byte key candidate at offset 0x10000236d in __TEXT,__const (likely 3DES or AES-192 key, entropy: 4.501629167387823)",
+      "extracted_value": "32344b6579214023",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "deprecated_algorithm",
+      "severity": "high",
+      "algorithm": "MD5",
+      "description": "MD5 is deprecated due to collision vulnerabilities. It should not be used for security purposes.",
+      "evidence": "Function _md5_hash_deprecated at 0x10000184c",
+      "recommendation": "Replace MD5 with SHA-256 or SHA-3 for secure hashing."
+    },
+    {
+      "type": "insecure_mode",
+      "severity": "high",
+      "algorithm": "AES-ECB",
+      "description": "ECB mode encrypts identical plaintext blocks to identical ciphertext, leaking patterns. Use CBC, CTR, or GCM modes.",
+      "evidence": "AES-ECB mode detected in function _aes_ecb_encrypt at 0x1000009f4",
+      "recommendation": "Use AES-CBC with random IV or AES-GCM for authenticated encryption."
+    }
+  ],
+  "structural_analysis": {
+    "crypto_patterns": [
+      "Substitution-Permutation Network (AES)",
+      "ARX (ChaCha20)"
+    ],
+    "code_obfuscation": "minimal",
+    "implementation_quality": "amateur"
+  },
+  "library_usage": {
+    "identified_libraries": [],
+    "custom_implementations": [
+      "Custom AES-ECB implementation",
+      "Custom ChaCha20 implementation",
+      "Custom MD5 implementation"
+    ]
+  },
+  "explainability": {
+    "summary": "This binary implements various cryptographic algorithms including AES-256 in ECB mode, ChaCha20, SHA-256, and RSA-2048. It also includes HMAC-SHA256 for message authentication and PBKDF2 for key derivation. The presence of hardcoded keys and deprecated algorithms like MD5 poses significant security risks.",
+    "security_score": 15,
+    "primary_purpose": "encryption",
+    "key_findings": [
+      "Multiple hardcoded AES keys (CRITICAL vulnerability)",
+      "Use of deprecated MD5 algorithm",
+      "AES-256 in insecure ECB mode",
+      "ChaCha20 and RSA-2048 detected",
+      "TLS 1.2 protocol implementation"
+    ]
+  },
+  "recommendations": [
+    {
+      "priority": "critical",
+      "category": "key_management",
+      "recommendation": "Remove hardcoded keys and implement secure key storage using KMS or derive keys from user input with PBKDF2/scrypt.",
+      "rationale": "Hardcoded keys allow anyone with binary access to decrypt all data, completely compromising security."
+    },
+    {
+      "priority": "high",
+      "category": "algorithm",
+      "recommendation": "Replace MD5 with SHA-256 or SHA-3 for secure
