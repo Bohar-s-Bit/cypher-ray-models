@@ -6,6 +6,7 @@ Main application file for the FastAPI server.
 import os
 import gc
 import logging
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,13 +55,35 @@ if check_angr_available():
 else:
     logger.warning("⚠️ Angr not available - binary analysis will use fallback mode")
 
-# Create FastAPI app
+# Lifespan context manager for startup/shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan events."""
+    # Startup
+    logger.info("=" * 60)
+    logger.info("CYPHERRAY ML SERVICE STARTING")
+    logger.info("=" * 60)
+    logger.info(f"Environment: {environment}")
+    logger.info(f"Log Level: {log_level}")
+    logger.info(f"CORS Origins: {cors_origins}")
+    logger.info(f"Primary AI: {'✅ Configured' if openai_api_key else '❌ Missing'}")
+    logger.info(f"Secondary AI: {'✅ Configured' if anthropic_api_key else '⚠️ Not configured'}")
+    logger.info(f"Angr: {'✅ Available' if check_angr_available() else '❌ Not available'}")
+    logger.info("=" * 60)
+    
+    yield  # Application runs here
+    
+    # Shutdown
+    logger.info("CypherRay ML Service shutting down...")
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title="CypherRay - Cryptographic Binary Analysis System",
     description="AI-powered cryptographic algorithm detection and binary analysis using multi-model orchestration",
     version="2.0.0",
     docs_url="/docs" if environment != "production" else None,
-    redoc_url="/redoc" if environment != "production" else None
+    redoc_url="/redoc" if environment != "production" else None,
+    lifespan=lifespan
 )
 
 # CORS middleware - configurable origins
@@ -93,27 +116,6 @@ except ImportError:
     logger.info("ℹ️ Logfire not installed (optional)")
 except Exception as e:
     logger.warning(f"⚠️ Logfire configuration skipped: {e}")
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Run on application startup."""
-    logger.info("=" * 60)
-    logger.info("CYPHERRAY ML SERVICE STARTING")
-    logger.info("=" * 60)
-    logger.info(f"Environment: {environment}")
-    logger.info(f"Log Level: {log_level}")
-    logger.info(f"CORS Origins: {cors_origins}")
-    logger.info(f"Primary AI: {'✅ Configured' if openai_api_key else '❌ Missing'}")
-    logger.info(f"Secondary AI: {'✅ Configured' if anthropic_api_key else '⚠️ Not configured'}")
-    logger.info(f"Angr: {'✅ Available' if check_angr_available() else '❌ Not available'}")
-    logger.info("=" * 60)
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Run on application shutdown."""
-    logger.info("CypherRay ML Service shutting down...")
 
 
 if __name__ == "__main__":
