@@ -34,20 +34,15 @@ gc.set_threshold(gc_threshold, 5, 5)  # More aggressive garbage collection
 logger.info(f"🧹 Garbage collection threshold: {gc_threshold}")
 
 # Check critical environment variables
-openai_api_key = os.getenv('OPENAI_API_KEY')
 anthropic_api_key = os.getenv('ANTHROPIC_API_KEY') or os.getenv('ANTRHOPIC_API_KEY')
 environment = os.getenv('ENVIRONMENT', 'development')
 log_level = os.getenv('LOG_LEVEL', 'INFO')
 
-if not openai_api_key:
-    logger.error("Primary AI API key not found in environment variables!")
+if not anthropic_api_key:
+    logger.error("Anthropic API key not found in environment variables!")
+    raise ValueError("ANTHROPIC_API_KEY must be set")
 else:
-    logger.info("✅ Primary AI provider configured")
-
-if anthropic_api_key:
-    logger.info("✅ Secondary AI provider configured")
-else:
-    logger.warning("⚠️ Secondary AI provider not configured (optional)")
+    logger.info("✅ Claude AI provider configured")
 
 # Check Angr availability
 if check_angr_available():
@@ -66,8 +61,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {environment}")
     logger.info(f"Log Level: {log_level}")
     logger.info(f"CORS Origins: {cors_origins}")
-    logger.info(f"Primary AI: {'✅ Configured' if openai_api_key else '❌ Missing'}")
-    logger.info(f"Secondary AI: {'✅ Configured' if anthropic_api_key else '⚠️ Not configured'}")
+    logger.info(f"Claude AI: {'✅ Configured' if anthropic_api_key else '❌ Missing'}")
     logger.info(f"Angr: {'✅ Available' if check_angr_available() else '❌ Not available'}")
     logger.info("=" * 60)
     

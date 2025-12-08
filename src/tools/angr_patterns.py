@@ -982,14 +982,43 @@ def angr_build_function_groups(binary_path: str) -> Dict[str, Any]:
         if not ANGR_AVAILABLE:
             return {"error": "Angr not available"}
         
-        project = angr.Project(binary_path, auto_load_libs=False)
-        cfg = project.analyses.CFGFast(normalize=True, force_complete_scan=True)
+        # CRITICAL FIX: Try normal load first, fallback to blob if needed
+        try:
+            project = angr.Project(binary_path, auto_load_libs=False)
+        except Exception as e:
+            logger.warning(f"Standard loader failed: {e}, trying blob loader...")
+            # Fallback to blob loader for raw binaries
+            project = angr.Project(binary_path, auto_load_libs=False, 
+                                   main_opts={'backend': 'blob', 'arch': 'x86_64'})
+        
+        # Limit CFG time to 2 minutes for large binaries (prevents 5-min timeout)
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("CFG analysis timeout")
+        
+        try:
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(120)  # 2-minute timeout
+            cfg = project.analyses.CFGFast(normalize=True, force_complete_scan=False)
+            signal.alarm(0)  # Cancel alarm
+        except TimeoutError:
+            logger.warning("CFG analysis timed out after 2 minutes, using partial results")
+            signal.alarm(0)
+            cfg = project.analyses.CFGFast(normalize=True, force_complete_scan=False)
         
         # Build call graph relationships
+        # CRITICAL: Limit to first 500 functions to prevent timeout on huge binaries
         function_groups = []
         visited = set()
+        func_count = 0
+        max_funcs_to_analyze = 500
         
         for func_addr, func in cfg.functions.items():
+            func_count += 1
+            if func_count > max_funcs_to_analyze:
+                logger.warning(f"Analyzed {max_funcs_to_analyze} functions, stopping to prevent timeout")
+                break
             if func.is_simprocedure or func.is_plt or func_addr in visited:
                 continue
             
@@ -997,11 +1026,32 @@ def angr_build_function_groups(binary_path: str) -> Dict[str, Any]:
             group = _build_function_cluster(func, cfg, visited)
             
             if len(group) >= 2:  # Only keep groups with 2+ functions
-                function_groups.append({
-                    "functions": list(group),
-                    "size": len(group),
-                    "root_function": func_addr
-                })
+                # ENHANCEMENT: Extract instruction patterns from group
+                try:
+                    crypto_patterns = _analyze_function_group_instructions(project, cfg, list(group))
+                    
+                    if crypto_patterns.get('crypto_likelihood', 0) > 0.3:
+                        logger.info(f"🔍 Group at {func_addr:x}: {crypto_patterns.get('summary')}")
+                    
+                    function_groups.append({
+                        "functions": list(group),
+                        "size": len(group),
+                        "root_function": func_addr,
+                        "crypto_score": crypto_patterns.get('crypto_likelihood', 0.0),
+                        "has_xor_chains": crypto_patterns.get('xor_count', 0) > 5,
+                        "has_rotations": crypto_patterns.get('rotation_count', 0) > 3,
+                        "has_lookups": crypto_patterns.get('lookup_count', 0) > 2,
+                        "pattern_summary": crypto_patterns.get('summary', 'No patterns detected')
+                    })
+                except Exception as e:
+                    logger.debug(f"Failed to analyze group at {func_addr:x}: {e}")
+                    function_groups.append({
+                        "functions": list(group),
+                        "size": len(group),
+                        "root_function": func_addr,
+                        "crypto_score": 0.0,
+                        "pattern_summary": "Analysis failed"
+                    })
         
         return {
             "function_groups": function_groups,
@@ -1102,4 +1152,123 @@ def _build_function_cluster(root_func, cfg, visited: set, max_depth=3) -> set:
                 pass
     
     return cluster
+
+
+def _analyze_function_group_instructions(project, cfg, function_addrs: list) -> Dict[str, Any]:
+    """
+    Analyze actual assembly instructions in a function group to detect crypto patterns.
+    CRITICAL for ultra-stripped binaries with no symbols/strings.
+    
+    Detects:
+    - XOR chains (indicator of encryption/obfuscation)
+    - Bit rotations (common in hash functions)
+    - Table lookups (S-boxes in AES, DES)
+    - Modular arithmetic (RSA, ECC)
+    
+    Args:
+        project: Angr project
+        cfg: Control flow graph
+        function_addrs: List of function addresses in the group
+    
+    Returns:
+        Dict with crypto pattern scores and summary
+    """
+    xor_count = 0
+    rotation_count = 0
+    lookup_count = 0
+    mod_count = 0
+    shift_count = 0
+    and_or_count = 0
+    
+    try:
+        # Analyze up to 10 functions in group (to avoid performance issues)
+        for func_addr in function_addrs[:10]:
+            if func_addr not in cfg.functions:
+                continue
+            
+            func = cfg.functions[func_addr]
+            
+            # Get basic blocks
+            for block in func.blocks:
+                try:
+                    # Disassemble block
+                    insn_addrs = block.instruction_addrs
+                    
+                    for insn_addr in insn_addrs[:50]:  # Limit to 50 instructions per block
+                        try:
+                            # Get instruction bytes
+                            insn_bytes = project.loader.memory.load(insn_addr, 16)
+                            
+                            # Disassemble instruction
+                            try:
+                                insn = next(project.arch.capstone.disasm(insn_bytes, insn_addr, count=1))
+                                mnemonic = insn.mnemonic.lower()
+                                
+                                # Count crypto-indicative instructions
+                                if 'xor' in mnemonic:
+                                    xor_count += 1
+                                elif 'rol' in mnemonic or 'ror' in mnemonic or 'rotate' in mnemonic:
+                                    rotation_count += 1
+                                elif mnemonic in ['movzx', 'movsx', 'ldr', 'ldrb'] and '[' in insn.op_str:
+                                    # Table lookup pattern
+                                    lookup_count += 1
+                                elif 'shl' in mnemonic or 'shr' in mnemonic or 'lsl' in mnemonic or 'lsr' in mnemonic:
+                                    shift_count += 1
+                                elif 'and' in mnemonic or 'or' in mnemonic:
+                                    and_or_count += 1
+                                elif 'mod' in mnemonic or 'div' in mnemonic:
+                                    mod_count += 1
+                                    
+                            except StopIteration:
+                                continue
+                        except Exception:
+                            continue
+                except Exception:
+                    continue
+        
+        # Calculate crypto likelihood score
+        crypto_score = 0.0
+        if xor_count > 10:
+            crypto_score += 0.3
+        if rotation_count > 5:
+            crypto_score += 0.25
+        if lookup_count > 3:
+            crypto_score += 0.2
+        if shift_count > 15:
+            crypto_score += 0.15
+        if and_or_count > 20:
+            crypto_score += 0.1
+        
+        # Generate summary
+        patterns = []
+        if xor_count > 10:
+            patterns.append(f"{xor_count} XOR operations")
+        if rotation_count > 5:
+            patterns.append(f"{rotation_count} rotations")
+        if lookup_count > 3:
+            patterns.append(f"{lookup_count} table lookups")
+        if shift_count > 15:
+            patterns.append(f"{shift_count} shifts")
+            
+        summary = f"Detected: {', '.join(patterns)}" if patterns else "No significant crypto patterns"
+        
+        return {
+            'crypto_likelihood': min(crypto_score, 1.0),
+            'xor_count': xor_count,
+            'rotation_count': rotation_count,
+            'lookup_count': lookup_count,
+            'shift_count': shift_count,
+            'and_or_count': and_or_count,
+            'summary': summary
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to analyze function group instructions: {e}")
+        return {
+            'crypto_likelihood': 0.0,
+            'xor_count': 0,
+            'rotation_count': 0,
+            'lookup_count': 0,
+            'summary': 'Analysis failed'
+        }
 

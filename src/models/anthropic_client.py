@@ -44,7 +44,7 @@ class AnthropicClient:
     def create_message(
         self,
         messages: List[Dict[str, str]],
-        model: str = "claude-3-5-sonnet-20241022",
+        model: str = "claude-3-5-haiku-20241022",
         system: Optional[str] = None,
         temperature: float = 0.2,
         max_tokens: int = 8000,
@@ -171,7 +171,7 @@ class AnthropicClient:
     def create_message_stream(
         self,
         messages: List[Dict[str, str]],
-        model: str = "claude-3-5-sonnet-20241022",
+        model: str = "claude-3-5-haiku-20241022",
         system: Optional[str] = None,
         temperature: float = 0.2,
         max_tokens: int = 8000,
@@ -238,7 +238,7 @@ if __name__ == "__main__":
         messages=[
             {"role": "user", "content": "What is 2+2? Answer briefly."}
         ],
-        model="claude-3-5-sonnet-20241022",
+        model="claude-3-5-sonnet-20240620",
         max_tokens=100
     )
     

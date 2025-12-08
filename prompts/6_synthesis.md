@@ -113,10 +113,24 @@ Synthesize all stage outputs into a single comprehensive report with 9 sections:
 **Rules:**
 
 - Use EXACT values from metadata - do NOT fill with "unknown" or null
-- If md5/sha256 not available from Angr, state "not_computed" (don't guess)
-- architecture: Use detected architecture (x86_64, aarch64, etc.)
-- format: ELF (Linux), Mach-O (macOS), PE (Windows)
+- If md5/sha256 not available from Angr, state "not_computed" (string OK for hashes)
+- **CRITICAL**: For numeric fields (size), use 0 if not available (NOT "not_computed")
+- architecture: Use detected architecture (x86_64, aarch64, etc.) or "unknown"
+- format: ELF (Linux), Mach-O (macOS), PE (Windows) or "unknown"
 - stripped: true if symbols removed, false if debug symbols present
+
+**Example:**
+
+```json
+{
+  "size": 432380,  // MUST be number! Use 0 if unknown
+  "md5": "abc123..." // OR "not_computed" for hashes (string OK)
+  "sha256": "not_computed",
+  "architecture": "unknown",
+  "format": "unknown",
+  "stripped": false
+}
+```
 
 ### 2. detected_algorithms
 

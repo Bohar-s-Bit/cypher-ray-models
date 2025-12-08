@@ -9,7 +9,6 @@ import asyncio
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
-from src.models.openai_client import OpenAIClient
 from src.models.anthropic_client import AnthropicClient
 from src.utils.logger import get_logger
 from src.utils.cost_tracker import CostTracker
@@ -45,8 +44,7 @@ class MultiModelOrchestrator:
         with open(config_path, 'r') as f:
             self.config = json.load(f)
         
-        # Initialize clients
-        self.openai_client = OpenAIClient(cost_tracker=self.cost_tracker)
+        # Initialize Claude client only
         self.anthropic_client = AnthropicClient(cost_tracker=self.cost_tracker)
         
         self.strategy = self.config.get('model_selection_strategy', {})
@@ -167,25 +165,8 @@ class MultiModelOrchestrator:
                     context_str = f"\n\nContext:\n{json.dumps(context, indent=2)}"
                     messages[0]["content"] += context_str
                 
-                # Call appropriate client
-                if provider == 'openai':
-                    response = self.openai_client.chat_completion(
-                        messages=messages,
-                        model=model_name,
-                        temperature=model_config.get('temperature', 0.2),
-                        max_tokens=model_config.get('max_tokens', 4000)
-                    )
-                    
-                    result = {
-                        'content': response['message'].content,
-                        'provider': 'openai',
-                        'model': model_name,
-                        'usage': response['usage'],
-                        'cost': response['cost'],
-                        'duration': response['duration']
-                    }
-                    
-                elif provider == 'anthropic':
+                # Call Anthropic client (Claude only)
+                if provider == 'anthropic':
                     response = self.anthropic_client.create_message(
                         messages=messages,
                         model=model_name,
@@ -202,7 +183,7 @@ class MultiModelOrchestrator:
                         'duration': response['duration']
                     }
                 else:
-                    raise ValueError(f"Unknown provider: {provider}")
+                    raise ValueError(f"Unsupported provider: {provider}. Only 'anthropic' (Claude) is supported.")
                 
                 # Cache successful response
                 self._cache_response(cache_key, result)

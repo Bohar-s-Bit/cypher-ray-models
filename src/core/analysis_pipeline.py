@@ -80,7 +80,7 @@ Now classify this binary according to the instructions above. Respond ONLY with 
         )
         
         # Parse response
-        triage = self._parse_json_response(result['content'])
+        triage = self._parse_json_response(result['content'], "Stage 1: Triage")
         triage['stage1_cost'] = result['cost']
         triage['stage1_model'] = result['model']
         
@@ -189,6 +189,35 @@ Now classify this binary according to the instructions above. Respond ONLY with 
             largest_group = results['function_groups'].get('largest_group_size', 0)
             logger.info(f"✅ Found {group_count} function groups (largest: {largest_group} functions)")
             
+            # CRITICAL FIX: If function extraction failed (0 functions) but we have function groups,
+            # populate functions list from the largest groups so AI has something to analyze
+            if len(results.get('functions', {}).get('functions', [])) == 0 and group_count > 0:
+                fg_data = results['function_groups']
+                if 'function_groups' in fg_data and fg_data['function_groups']:
+                    # Extract top 20 largest functions from top 5 groups
+                    all_groups = fg_data['function_groups']
+                    top_groups = sorted(all_groups, key=lambda g: g.get('size', 0), reverse=True)[:5]
+                    
+                    # Collect all unique function addresses
+                    func_addrs = set()
+                    for group in top_groups:
+                        func_addrs.update(group.get('functions', []))
+                    
+                    # Create minimal function entries for AI analysis
+                    results['functions'] = {
+                        'functions': [
+                            {
+                                'name': f'func_{hex(addr)}',
+                                'address': hex(addr),
+                                'size': 'unknown',
+                                'complexity': 'unknown',
+                                'calls_crypto_apis': False
+                            }
+                            for addr in sorted(list(func_addrs))[:20]  # Limit to 20 functions
+                        ]
+                    }
+                    logger.info(f"✅ Populated {len(results['functions']['functions'])} functions from function groups for AI analysis")
+            
             # Aggregate patterns across function groups
             if group_count > 0:
                 aggregated_score = self._aggregate_patterns_across_groups(
@@ -242,7 +271,7 @@ Now detect all cryptographic algorithms according to the instructions above. Res
             analysis_type='main_analysis'
         )
         
-        algorithms = self._parse_json_response(result['content'])
+        algorithms = self._parse_json_response(result['content'], "Stage 3: Algorithm Detection")
         logger.info(f"✅ Detected {len(algorithms) if isinstance(algorithms, list) else 0} algorithms")
         
         return {
@@ -292,7 +321,7 @@ Now analyze all crypto-related functions according to the instructions above. Re
             analysis_type='main_analysis'
         )
         
-        functions = self._parse_json_response(result['content'])
+        functions = self._parse_json_response(result['content'], "Stage 4: Function Analysis")
         logger.info(f"✅ Analyzed {len(functions) if isinstance(functions, list) else 0} functions")
         
         return {
@@ -355,7 +384,7 @@ Now scan for all vulnerabilities according to the instructions above. Respond ON
             analysis_type='main_analysis'
         )
         
-        vulnerabilities = self._parse_json_response(result['content'])
+        vulnerabilities = self._parse_json_response(result['content'], "Stage 5: Vulnerability Scan")
         logger.info(f"✅ Found {len(vulnerabilities) if isinstance(vulnerabilities, list) else 0} vulnerabilities")
         
         return {
@@ -406,7 +435,7 @@ Now identify all cryptographic protocols according to the instructions above. Re
             analysis_type='main_analysis'
         )
         
-        protocols = self._parse_json_response(result['content'])
+        protocols = self._parse_json_response(result['content'], "Stage 6: Protocol Detection")
         logger.info(f"✅ Detected {len(protocols) if isinstance(protocols, list) else 0} protocols")
         
         return {
@@ -467,7 +496,7 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         )
         
         try:
-            final_report = self._parse_json_response(result['content'])
+            final_report = self._parse_json_response(result['content'], "Stage 7: Final Synthesis")
         except json.JSONDecodeError as e:
             # Log the malformed JSON for debugging
             logger.error(f"❌ JSON parsing failed in final synthesis: {e}")
@@ -518,7 +547,7 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
                     analysis_type='json_repair'
                 )
                 
-                final_report = self._parse_json_response(retry_result['content'])
+                final_report = self._parse_json_response(retry_result['content'], "Stage 7: Final Synthesis (Retry)")
                 logger.info("✅ JSON re-generation successful")
                 
                 # Update cost
@@ -719,8 +748,26 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
             logger.info(f"✅ Included aggregated_crypto_score: {angr_results['aggregated_crypto_score']:.2f}")
         
         if 'function_groups' in angr_results:
-            optimized['function_groups'] = angr_results['function_groups']
-            logger.info(f"✅ Included {len(angr_results['function_groups'])} function groups")
+            # CRITICAL FIX: Send only TOP 3-5 largest groups (not all 1107!)
+            # Full list causes 250K token overflow
+            fg_data = angr_results['function_groups']
+            
+            # Extract the actual list of groups (angr_build_function_groups returns a dict)
+            if isinstance(fg_data, dict) and 'function_groups' in fg_data:
+                all_groups = fg_data['function_groups']
+            elif isinstance(fg_data, list):
+                all_groups = fg_data
+            else:
+                logger.warning(f"Unexpected function_groups format: {type(fg_data)}")
+                all_groups = []
+            
+            # Filter to top 5 largest groups
+            if all_groups:
+                top_groups = sorted(all_groups, key=lambda g: g.get('size', 0), reverse=True)[:5]
+                optimized['function_groups'] = top_groups
+                logger.info(f"✅ Included {len(top_groups)} function groups (filtered from {len(all_groups)} total)")
+            else:
+                logger.warning("No function groups found to include")
         
         # Base crypto likelihood (for comparison)
         if 'crypto_likelihood_score' in angr_results:
@@ -804,7 +851,7 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
         
         return aggregated
     
-    def _parse_json_response(self, content: str) -> Any:
+    def _parse_json_response(self, content: str, stage_name: str = "unknown") -> Any:
         """
         Parse JSON from LLM response with multiple repair strategies.
         
@@ -816,6 +863,7 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
         
         Args:
             content: LLM response content
+            stage_name: Name of the stage for error logging
             
         Returns:
             Parsed JSON object
@@ -826,19 +874,23 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
         try:
             return json.loads(content)
         except json.JSONDecodeError as e:
-            logger.warning(f"Direct JSON parse failed: {e}")
+            logger.warning(f"Direct JSON parse failed in {stage_name}: {e}")
+            logger.warning(f"AI response was: {content[:500]}...")  # Show first 500 chars
         
         # Strategy 2: Extract from markdown code blocks
-        cleaned_content = content
-        if "```json" in content:
-            cleaned_content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            cleaned_content = content.split("```")[1].split("```")[0].strip()
+        cleaned_content = content.strip()
+        if "```json" in cleaned_content:
+            cleaned_content = cleaned_content.split("```json")[1].split("```")[0].strip()
+        elif "```" in cleaned_content:
+            # Handle cases where AI returns ```\n[]\n``` or ```\n{}\n```
+            cleaned_content = cleaned_content.split("```")[1].split("```")[0].strip()
         
         try:
-            return json.loads(cleaned_content)
+            parsed = json.loads(cleaned_content)
+            logger.info(f"Successfully parsed JSON from {stage_name}")
+            return parsed
         except json.JSONDecodeError as e:
-            logger.warning(f"Markdown extraction failed: {e}")
+            logger.warning(f"Markdown extraction failed in {stage_name}: {e}")
         
         # Strategy 3: Repair common JSON errors
         try:

@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n    {\n        \"type\": \"hardcoded_secret\",\n        \"severity\": \"critical\", \n        \"algorithm\": \"AES/DES\",\n        \"description\": \"Multiple hardcoded cryptographic keys/IVs detected in binary's constant section. These can be directly extracted and used to compromise encryption.\",\n        \"evidence\": \"10 hardcoded key/IV candidates found in __TEXT,__const section at offsets 0x1000012b1-0x1000012ba\",\n        \"extracted_value\": \"7c777bf26b6fc530\",\n        \"recommendation\": \"Use secure key management systems (KMS/HSM), implement key rotation, and derive keys dynamically using PBKDF2 or similar key derivation functions\"\n    },\n    {\n        \"type\": \"deprecated_algorithm\",\n        \"severity\": \"high\",\n        \"algorithm\": \"DES\",\n        \"description\": \"Potential DES key/IV candidates detected, indicating possible use of deprecated DES cryptography\",\n        \"evidence\": \"Multiple 8-byte key candidates with low entropy (3.0) suggest DES-like structure\",\n        \"recommendation\": \"Immediately replace DES with AES-256 or modern authenticated encryption modes like AES-GCM\"\n    }\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 10293,
+      "output_tokens": 298,
+      "total_tokens": 10591
+    },
+    "cost": 0.0094264,
+    "duration": 8.926318883895874
+  },
+  "timestamp": 1765230704.735254,
+  "ttl": 86400,
+  "created_at": "2025-12-09T03:21:44.735255"
+}

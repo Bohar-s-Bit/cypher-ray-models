@@ -8,7 +8,6 @@ import json
 import tempfile
 import traceback
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
-from openai import OpenAI
 
 from src.api.models import AnalysisResponse, HealthResponse
 from src.core.angr_tools import ANGR_TOOLS, ANGR_FUNCTION_MAP, check_angr_available
@@ -54,7 +53,6 @@ async def root():
         },
         "status": {
             "angr_available": check_angr_available(),
-            "openai_configured": bool(os.getenv('OPENAI_API_KEY')),
             "anthropic_configured": bool(os.getenv('ANTHROPIC_API_KEY') or os.getenv('ANTRHOPIC_API_KEY'))
         }
     }
@@ -64,23 +62,22 @@ async def root():
 async def health_check():
     """Health check endpoint for monitoring and deployment platforms."""
     angr_available = check_angr_available()
-    openai_key_present = bool(os.getenv('OPENAI_API_KEY'))
     anthropic_key_present = bool(os.getenv('ANTHROPIC_API_KEY') or os.getenv('ANTRHOPIC_API_KEY'))
     
     health_status = HealthResponse(
-        status="healthy" if (angr_available and openai_key_present) else "degraded",
+        status="healthy" if (angr_available and anthropic_key_present) else "degraded",
         angr_available=angr_available,
-        openai_configured=openai_key_present,
+        openai_configured=False,  # Deprecated, kept for backwards compatibility
         anthropic_configured=anthropic_key_present,
         service="CypherRay ML Service",
         version="2.0.0"
     )
     
     # Return 503 if critical dependencies are missing
-    if not openai_key_present:
+    if not anthropic_key_present:
         raise HTTPException(
             status_code=503,
-            detail="OpenAI API key not configured. Set OPENAI_API_KEY environment variable."
+            detail="Anthropic API key not configured. Set ANTHROPIC_API_KEY environment variable."
         )
     
     return health_status
@@ -206,7 +203,7 @@ async def analyze_binary(file: UploadFile = File(...), force_deep: bool = Form(F
     🚀 Analyze binary executable using intelligent multi-stage pipeline.
     
     This endpoint uses a cost-optimized 3-stage approach:
-    1. Quick triage (GPT-4o-mini) - determines if binary is cryptographic
+    1. Quick triage (Claude Haiku) - determines if binary is cryptographic
     2. Angr extraction - static analysis of binary 
     3. LLM synthesis (model selected based on complexity) - comprehensive analysis
     
