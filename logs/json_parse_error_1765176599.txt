@@ -1,0 +1,483 @@
+JSON Parsing Error:
+Failed to parse JSON after all repair strategies. Content preview: ```json
+{
+  "file_metadata": {
+    "size": 33800,
+    "md5": "9797d0ca45e442a34b34f5597be490cd",
+    "sha256": "f1e8051bede78966d818df0e2fa83adee8858fd7cb5649169333914f977ef152",
+    "architecture": "...: line 1 column 1 (char 0)
+
+Full Content:
+```json
+{
+  "file_metadata": {
+    "size": 33800,
+    "md5": "9797d0ca45e442a34b34f5597be490cd",
+    "sha256": "f1e8051bede78966d818df0e2fa83adee8858fd7cb5649169333914f977ef152",
+    "architecture": "AARCH64",
+    "format": "Mach-O",
+    "stripped": false
+  },
+  "detected_algorithms": [
+    {
+      "name": "AES",
+      "type": "symmetric",
+      "confidence": 0.9,
+      "evidence": [
+        "AES S-box constants found at 0x1000012b0",
+        "AES RCON constants found at 0x1000013b0",
+        "S-box pattern with 64 table accesses in function _main",
+        "S-box pattern with 133 table accesses in function __u0"
+      ],
+      "locations": [
+        "0x100000b84",
+        "0x100000460"
+      ]
+    },
+    {
+      "name": "SHA-256",
+      "type": "hash",
+      "confidence": 0.85,
+      "evidence": [
+        "Hash constants detected: [1116352408, 1899447441, 3921009573, 3049323471] in multiple functions"
+      ],
+      "locations": [
+        "0x100000b84",
+        "0x100001488",
+        "0x1000012c4",
+        "0x1000012dc",
+        "0x100001308",
+        "0x10000131c",
+        "0x10000132c",
+        "0x100001334",
+        "0x100001338",
+        "0x100001348",
+        "0x100001350",
+        "0x10000135c",
+        "0x100001378",
+        "0x100001388",
+        "0x100001394",
+        "0x1000013a0",
+        "0x1000013ac",
+        "0x1000013c0",
+        "0x1000013cc",
+        "0x1000013d4",
+        "0x1000013e0",
+        "0x1000013ec",
+        "0x10000140c",
+        "0x100001414",
+        "0x10000141c",
+        "0x100001424",
+        "0x100001438",
+        "0x100001440",
+        "0x100001458",
+        "0x100001478",
+        "0x100001480"
+      ]
+    }
+  ],
+  "detected_functions": [
+    {
+      "name": "__u0",
+      "address": "0x100000460",
+      "crypto_operations": [
+        "substitute"
+      ],
+      "explanation": "This function likely performs AES S-box substitution, as indicated by the 133 table accesses pattern, which is a core operation in AES encryption rounds.",
+      "confidence": 0.95,
+      "related_algorithm": "AES"
+    },
+    {
+      "name": "_main",
+      "address": "0x100000b84",
+      "crypto_operations": [
+        "substitute"
+      ],
+      "explanation": "This function likely performs AES S-box substitution, as indicated by the 64 table accesses pattern, which is a core operation in AES encryption rounds.",
+      "confidence": 0.95,
+      "related_algorithm": "AES"
+    },
+    {
+      "name": "sub_1000012c4",
+      "address": "0x1000012c4",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_1000012dc",
+      "address": "0x1000012dc",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001308",
+      "address": "0x100001308",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_10000131c",
+      "address": "0x10000131c",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_10000132c",
+      "address": "0x10000132c",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001334",
+      "address": "0x100001334",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001338",
+      "address": "0x100001338",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001348",
+      "address": "0x100001348",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001350",
+      "address": "0x100001350",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_10000135c",
+      "address": "0x10000135c",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001378",
+      "address": "0x100001378",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001388",
+      "address": "0x100001388",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001394",
+      "address": "0x100001394",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_1000013a0",
+      "address": "0x1000013a0",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_1000013ac",
+      "address": "0x1000013ac",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_1000013c0",
+      "address": "0x1000013c0",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_1000013cc",
+      "address": "0x1000013cc",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_1000013d4",
+      "address": "0x1000013d4",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_1000013e0",
+      "address": "0x1000013e0",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_1000013ec",
+      "address": "0x1000013ec",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_10000140c",
+      "address": "0x10000140c",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001414",
+      "address": "0x100001414",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_10000141c",
+      "address": "0x10000141c",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001424",
+      "address": "0x100001424",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001438",
+      "address": "0x100001438",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001440",
+      "address": "0x100001440",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001458",
+      "address": "0x100001458",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001478",
+      "address": "0x100001478",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001480",
+      "address": "0x100001480",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    },
+    {
+      "name": "sub_100001488",
+      "address": "0x100001488",
+      "crypto_operations": [
+        "compression",
+        "rotation",
+        "addition"
+      ],
+      "explanation": "This function is likely part of the SHA-256 hash algorithm, performing operations typical of the SHA-256 compression function.",
+      "confidence": 0.85,
+      "related_algorithm": "SHA-256"
+    }
+  ],
+  "detected_protocols": [],
+  "vulnerabilities": [
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "AES",
+      "description": "Hardcoded 16-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "16-byte key candidate at offset 0x1000012b1 in __TEXT,__const (likely AES-128 key or IV, entropy: 4.0)",
+      "extracted_value": "7c777bf26b6fc530",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    },
+    {
+      "type": "hardcoded_secret",
+      "severity": "critical",
+      "algorithm": "DES",
+      "description": "Hardcoded 8-byte encryption key found in binary. Anyone with access to the binary can extract the key and decrypt all data.",
+      "evidence": "8-byte key candidate at offset 0x1000012b2 in __TEXT,__const (likely DES key or IV, entropy: 3.0)",
+      "extracted_value": "777bf26b6fc53001",
+      "recommendation": "Store keys securely using key management systems (KMS, HSM) or derive from user input with proper key derivation (PBKDF2, scrypt)"
+    }
+  ],
+  "structural_analysis": {
+    "crypto_patterns": [

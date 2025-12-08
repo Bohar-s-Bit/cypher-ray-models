@@ -484,8 +484,74 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
             except Exception as write_error:
                 logger.error(f"Could not save error file: {write_error}")
             
-            # Re-raise with more context
-            raise ValueError(f"Final synthesis JSON parsing failed at position {e.pos}: {e.msg}") from e
+            # Try one more aggressive repair: Request re-generation with stricter prompt
+            logger.warning("⚠️ Attempting JSON re-generation with stricter prompt...")
+            try:
+                retry_query = f"""
+The previous JSON response had syntax errors. Please regenerate ONLY valid JSON.
+
+CRITICAL REQUIREMENTS:
+1. No markdown code blocks (```json or ```)
+2. No trailing commas
+3. All strings properly escaped
+4. No comments
+5. Start with {{ and end with }}
+
+Previous data to format correctly:
+{result['content'][:1000]}...
+
+Generate a valid JSON report with this structure:
+{{
+  "file_metadata": {{}},
+  "detected_algorithms": [],
+  "function_analyses": [],
+  "vulnerability_assessment": {{}},
+  "recommendations": [],
+  "risk_score": 0
+}}
+
+RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
+"""
+                retry_result = await self.orchestrator.analyze(
+                    query=retry_query,
+                    context={},
+                    analysis_type='json_repair'
+                )
+                
+                final_report = self._parse_json_response(retry_result['content'])
+                logger.info("✅ JSON re-generation successful")
+                
+                # Update cost
+                result['cost'] += retry_result['cost']
+                result['duration'] += retry_result['duration']
+                
+            except Exception as retry_error:
+                logger.error(f"❌ JSON re-generation also failed: {retry_error}")
+                
+                # Last resort: Return minimal valid report
+                logger.warning("⚠️ Returning minimal fallback report")
+                final_report = {
+                    "file_metadata": angr_results.get('metadata', {}),
+                    "detected_algorithms": angr_results.get('inferred_algorithms', []),
+                    "function_analyses": [],
+                    "vulnerability_assessment": {
+                        "vulnerabilities": [{
+                            "type": "ANALYSIS_ERROR",
+                            "severity": "INFO",
+                            "description": "Analysis completed with JSON parsing errors. Manual review recommended.",
+                            "details": f"LLM response could not be parsed: {str(e)[:200]}"
+                        }],
+                        "risk_score": 0,
+                        "overall_assessment": "Analysis incomplete due to JSON parsing errors"
+                    },
+                    "recommendations": [
+                        "Manual security review recommended due to automated analysis errors"
+                    ],
+                    "risk_score": 0,
+                    "analysis_status": "PARTIAL_FAILURE",
+                    "error_details": str(e)[:500]
+                }
+
         
         # Add analysis metadata
         final_report['_analysis_metadata'] = {
@@ -778,8 +844,20 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
         try:
             repaired = cleaned_content
             
+            # Remove any text before first { and after last }
+            first_brace = repaired.find('{')
+            last_brace = repaired.rfind('}')
+            if first_brace != -1 and last_brace != -1:
+                repaired = repaired[first_brace:last_brace+1]
+            
             # Remove trailing commas before closing brackets/braces
             repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
+            
+            # Fix unescaped newlines in strings (they break JSON)
+            repaired = re.sub(r'(?<!\\)\n(?=[^"]*"(?:[^"]*"[^"]*")*[^"]*$)', r'\\n', repaired)
+            
+            # Remove control characters except valid whitespace
+            repaired = ''.join(char for char in repaired if ord(char) >= 32 or char in '\n\r\t')
             
             # Fix common quote escaping issues in property names
             # Replace unescaped quotes in values (heuristic: after colons)
@@ -788,6 +866,34 @@ Now synthesize all stage outputs into the final comprehensive JSON report accord
             return json.loads(repaired)
         except json.JSONDecodeError as e:
             logger.warning(f"JSON repair failed: {e}")
+        
+        # Strategy 4: Aggressive repair - truncate and close structures
+        try:
+            # Start fresh from cleaned content
+            repaired = cleaned_content
+            first_brace = repaired.find('{')
+            if first_brace != -1:
+                repaired = repaired[first_brace:]
+            
+            # Count unclosed structures
+            open_braces = repaired.count('{') - repaired.count('}')
+            open_brackets = repaired.count('[') - repaired.count(']')
+            open_quotes = repaired.count('"') % 2
+            
+            # Close any unclosed structures
+            if open_quotes == 1:
+                repaired += '"'
+            if open_brackets > 0:
+                repaired += ']' * open_brackets
+            if open_braces > 0:
+                repaired += '}' * open_braces
+            
+            # Remove trailing commas again
+            repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
+            
+            return json.loads(repaired)
+        except (json.JSONDecodeError, AttributeError) as e:
+            logger.warning(f"Aggressive JSON repair failed: {e}")
         
         # Strategy 4: Regex extraction (last resort)
         try:
