@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n    {\n        \"protocol\": \"TLS\",\n        \"version\": \"1.2/1.3\",\n        \"confidence\": 0.95,\n        \"evidence\": [\n            \"TLS 1.2 and 1.3 constants detected\",\n            \"Client/Server Hello patterns found\",\n            \"TLS AES-GCM and ChaCha20 cipher suites detected\"\n        ],\n        \"cipher_suites\": [\n            \"TLS_AES_256_GCM_SHA256\", \n            \"TLS_CHACHA20_POLY1305_SHA256\"\n        ],\n        \"implementation_status\": \"complete\",\n        \"security_notes\": \"Modern TLS versions with strong cipher suites - excellent security configuration\"\n    }\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 8091,
+      "output_tokens": 187,
+      "total_tokens": 8278
+    },
+    "cost": 0.0072207999999999994,
+    "duration": 4.266318082809448
+  },
+  "timestamp": 1765271835.564457,
+  "ttl": 86400,
+  "created_at": "2025-12-09T14:47:15.564458"
+}

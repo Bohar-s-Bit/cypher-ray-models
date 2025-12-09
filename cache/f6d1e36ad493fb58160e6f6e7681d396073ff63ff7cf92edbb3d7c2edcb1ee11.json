@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"high\",\n    \"algorithm\": \"SHA-1\",\n    \"description\": \"SHA-1 is deprecated due to collision vulnerabilities and is no longer considered cryptographically secure for signatures or integrity checks.\",\n    \"evidence\": \"SHA-1 initialization vectors found at 0x943e8-0x943f8\",\n    \"recommendation\": \"Replace SHA-1 with SHA-256 or SHA-3 for all security-critical applications\"\n  },\n  {\n    \"type\": \"deprecated_algorithm\", \n    \"severity\": \"critical\",\n    \"algorithm\": \"MD5\",\n    \"description\": \"MD5 is deprecated due to significant collision vulnerabilities that compromise its cryptographic integrity.\",\n    \"evidence\": \"MD5 initialization constants found at 0x943e8-0x943f4\",\n    \"recommendation\": \"Immediately replace MD5 with secure hash functions like SHA-256 or SHA-3\"\n  },\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"critical\", \n    \"algorithm\": \"RC4\",\n    \"description\": \"RC4 is a deprecated stream cipher with known cryptographic weaknesses and biases in its keystream.\",\n    \"evidence\": \"RC4 initialization pattern found at 0x141742, Key scheduling algorithm (KSA) pattern detected at 0x1c5\",\n    \"recommendation\": \"Replace RC4 with modern stream ciphers like ChaCha20 or use AES in CTR mode\"\n  },\n  {\n    \"type\": \"weak_algorithm\",\n    \"severity\": \"low\",\n    \"algorithm\": \"XOR Cipher\",\n    \"description\": \"XOR encryption is an extremely weak encryption method that provides no real cryptographic security.\",\n    \"evidence\": \"XOR encryption loops detected for ARM at 0xb7, XOR encryption loops detected for MIPS at 0x34e5\",\n    \"recommendation\": \"Replace XOR encryption with standard encryption algorithms like AES\"\n  }\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 8367,
+      "output_tokens": 480,
+      "total_tokens": 8847
+    },
+    "cost": 0.0086136,
+    "duration": 9.223191976547241
+  },
+  "timestamp": 1765271831.2942002,
+  "ttl": 86400,
+  "created_at": "2025-12-09T14:47:11.294201"
+}

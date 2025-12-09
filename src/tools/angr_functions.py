@@ -155,33 +155,40 @@ def angr_extract_functions(
             
             logger.info(f"✅ Found {len(all_functions)} auto-discovered functions")
             
-            # Step 2: Filter to top candidates based on YARA hits and size
-            logger.info("⚡ Step 2: Filtering to crypto-relevant candidates...")
+            # Step 2: Build candidates from YARA hit addresses (targeted search)
+            logger.info("⚡ Step 2: Building candidates from YARA hit addresses...")
             candidates = []
             yara_addrs = set(yara_tags.keys()) if yara_tags else set()
             
-            # First priority: Add ALL YARA-tagged functions
+            logger.info(f"🎯 Searching for functions at {len(yara_addrs)} YARA hit addresses")
+            
+            # Search for functions at each YARA address
             for addr in yara_addrs:
                 if addr in all_functions:
                     func = all_functions[addr]
                     candidates.append((addr, func, True))
+                    logger.debug(f"  ✓ Found function at {hex(addr)}")
             
-            logger.info(f"✅ Found {len(candidates)} YARA-tagged functions")
+            logger.info(f"✅ Found {len(candidates)}/{len(yara_addrs)} functions at YARA addresses")
             
-            # Second priority: Add large functions (likely crypto implementations)
-            if len(candidates) < 15:
-                for addr, func in list(all_functions.items())[:500]:  # Check more functions
+            # Add some large functions nearby YARA hits for context
+            if len(candidates) < 12:
+                logger.info("⚡ Supplementing with nearby large functions...")
+                for addr, func in list(all_functions.items())[:300]:
                     if addr in yara_addrs:
-                        continue  # Skip already added
+                        continue
                     
                     size = func.size if hasattr(func, 'size') else 0
-                    if size >= 100:  # 100+ bytes = substantial function
+                    # Check if near any YARA address (within 4KB)
+                    near_yara = any(abs(addr - yaddr) < 4096 for yaddr in yara_addrs)
+                    
+                    if near_yara and size >= 100:
                         candidates.append((addr, func, False))
                     
-                    if len(candidates) >= 15:  # Total 15 candidates max
+                    if len(candidates) >= 12:
                         break
             
-            logger.info(f"✅ Total {len(candidates)} crypto-relevant candidates")
+            logger.info(f"✅ Total {len(candidates)} candidates for CFG analysis")
             
             # CRITICAL: If we have YARA hits but no matching functions, synthesize them
             if len(candidates) == 0 and yara_addrs:
