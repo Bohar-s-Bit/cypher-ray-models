@@ -35,8 +35,32 @@ def angr_analyze_binary_metadata(binary_path: str) -> Dict[str, Any]:
             sha1_hash = hashlib.sha1(content).hexdigest()
             sha256_hash = hashlib.sha256(content).hexdigest()
         
-        # Load binary with Angr
-        project = angr.Project(binary_path, auto_load_libs=False)
+        # Try to load binary with Angr (with blob fallback for raw binaries)
+        project = None
+        try:
+            project = angr.Project(binary_path, auto_load_libs=False)
+        except Exception as load_error:
+            # If standard loaders fail, try blob loader for raw binaries (firmware, shellcode, etc.)
+            if "loader backend" in str(load_error).lower() or "blob" in str(load_error).lower():
+                try:
+                    project = angr.Project(binary_path, 
+                                         main_opts={'backend': 'blob', 'arch': 'x86_64'},
+                                         auto_load_libs=False)
+                except:
+                    # Blob loader also failed, return hashes only
+                    return {
+                        "file_type": "raw binary (unknown format)",
+                        "architecture": "unknown",
+                        "size_bytes": os.path.getsize(binary_path),
+                        "entry_point": "0x0",
+                        "md5": md5_hash,
+                        "sha1": sha1_hash,
+                        "sha256": sha256_hash,
+                        "endianness": "unknown",
+                        "bits": 0
+                    }
+            else:
+                raise load_error
         
         return {
             "file_type": f"{project.loader.main_object.os} {project.arch.name}",

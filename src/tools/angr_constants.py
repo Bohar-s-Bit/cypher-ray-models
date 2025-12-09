@@ -3,6 +3,7 @@ Angr tool for detecting known cryptographic constants in binaries.
 """
 
 from typing import Dict, Any
+from .angr_loader_helper import load_binary_with_fallback
 
 try:
     import angr
@@ -26,7 +27,8 @@ def angr_detect_crypto_constants(binary_path: str) -> Dict[str, Any]:
         if not ANGR_AVAILABLE:
             return {"error": "Angr is not available in this environment"}
         
-        project = angr.Project(binary_path, auto_load_libs=False)
+        # Use blob loader fallback for raw binaries
+        project = load_binary_with_fallback(binary_path, auto_load_libs=False)
         
         # Comprehensive crypto constants database
         crypto_constants = {

@@ -5,14 +5,54 @@ Tracks how data is transformed through XOR chains, rotations, substitutions, etc
 
 from typing import Dict, Any, List
 import logging
+import os
+import sys
+import io
+from contextlib import contextmanager
+from .angr_loader_helper import load_binary_with_fallback
 
 logger = logging.getLogger(__name__)
 
 try:
     import angr
+    # Suppress verbose Angr output
+    logging.getLogger('angr').setLevel(logging.ERROR)
+    logging.getLogger('cle').setLevel(logging.ERROR)
+    logging.getLogger('pyvex').setLevel(logging.ERROR)
+    os.environ['ANGR_PROGRESS_DISABLED'] = '1'
     ANGR_AVAILABLE = True
 except ImportError:
     ANGR_AVAILABLE = False
+
+
+@contextmanager
+def suppress_stdout():
+    """Suppress stdout AND stderr to hide Angr's CFGFast progress spam.
+    Uses file descriptor level redirection to catch all output."""
+    import tempfile
+    # Save original file descriptors
+    stdout_fd = sys.stdout.fileno()
+    stderr_fd = sys.stderr.fileno()
+    saved_stdout = os.dup(stdout_fd)
+    saved_stderr = os.dup(stderr_fd)
+    
+    # Redirect to devnull
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.dup2(devnull, stdout_fd)
+        os.dup2(devnull, stderr_fd)
+        yield
+    finally:
+        # Restore original file descriptors
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.dup2(saved_stdout, stdout_fd)
+        os.dup2(saved_stderr, stderr_fd)
+        os.close(saved_stdout)
+        os.close(saved_stderr)
+        os.close(devnull)
 
 
 def angr_analyze_dataflow(binary_path: str) -> Dict[str, Any]:
@@ -36,14 +76,26 @@ def angr_analyze_dataflow(binary_path: str) -> Dict[str, Any]:
             return {"error": "Angr is not available in this environment"}
         
         logger.info(f"Loading binary for dataflow: {binary_path}")
-        project = angr.Project(binary_path, auto_load_libs=False)
+        project = load_binary_with_fallback(binary_path, auto_load_libs=False)
+        
+        # Check if blob-loaded
+        from .angr_loader_helper import is_blob_loaded
+        is_raw_binary = is_blob_loaded(project)
         
         logger.info("Building CFG for dataflow...")
-        cfg = project.analyses.CFGFast(
-            normalize=True,
-            force_complete_scan=True
-        )
-        logger.info(f"CFG built: {len(cfg.functions)} functions found")
+        with suppress_stdout():
+            cfg = project.analyses.CFGFast(
+                normalize=True,
+                force_complete_scan=False if is_raw_binary else True  # Skip complete scan for blobs
+            )
+        
+        func_count = len(cfg.functions)
+        logger.info(f"CFG built: {func_count} functions found")
+        
+        # For blob binaries, analyze even fewer functions (aggressive optimization)
+        top_n = 10 if is_raw_binary else 30
+        if is_raw_binary:
+            logger.info(f"   Blob binary: limiting dataflow to top {top_n} functions (aggressive mode)")
         
         dataflow_patterns = {
             "xor_chains": [],
@@ -57,7 +109,7 @@ def angr_analyze_dataflow(binary_path: str) -> Dict[str, Any]:
             cfg.functions.values(),
             key=lambda f: len(list(f.blocks)) if not f.is_simprocedure else 0,
             reverse=True
-        )[:30]  # Top 30 complex functions
+        )[:top_n]  # Limit based on binary type
         
         for func in sorted_functions:
             if func.is_simprocedure or func.is_plt:

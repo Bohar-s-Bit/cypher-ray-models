@@ -274,6 +274,14 @@ Strings explicitly naming algorithms:
 
 ## Output Format
 
+**CRITICAL: RETURN ONLY THE JSON ARRAY - NO EXPLANATIONS, NO MARKDOWN, NO PREAMBLE**
+
+✅ Correct: `[{"algorithm":"AES",...}]`
+
+❌ Wrong: `Based on analysis: [{"algorithm":"AES",...}]`
+
+**Your response must start with `[` and contain nothing before or after the JSON array.**
+
 For EACH detected algorithm, provide:
 
 ```json
@@ -289,9 +297,31 @@ For EACH detected algorithm, provide:
   "functions": ["function_name1", "function_name2"],
   "locations": ["0xaddress1", "0xaddress2"],
   "is_proprietary": false,
-  "standard_library": "OpenSSL|mbedTLS|libsodium|Crypto++|null"
+  "standard_library": "OpenSSL|mbedTLS|libsodium|Crypto++|null",
+  "cipher_characteristics": {
+    "cipher_type": "block|stream|sponge|null",
+    "mode_of_operation": "CBC|CTR|GCM|ECB|CFB|OFB|CCM|XTS|null",
+    "key_size_bits": 128|192|256|512|1024|2048|3072|4096|null,
+    "block_size_bits": 64|128|256|512|1024|null,
+    "iv_nonce_required": true|false|null
+  }
 }
 ```
+
+**Cipher Characteristics Rules:**
+- **cipher_type**: 
+  - "block" for AES, DES, 3DES, Blowfish, Twofish, IDEA, Camellia
+  - "stream" for RC4, ChaCha20, Salsa20
+  - "sponge" for SHA-3/Keccak
+  - null for hashes, asymmetric, non-encryption algorithms
+- **mode_of_operation**: Only for block ciphers. Look for strings like "CBC", "GCM", function names like `aes_gcm_encrypt`, or characteristic patterns:
+  - ECB: No IV handling
+  - CBC: IV XOR before encryption
+  - CTR: Counter mode (stream-like behavior)
+  - GCM: Galois Counter Mode (authenticated encryption)
+- **key_size_bits**: Extract from algorithm name or key schedule operations
+- **block_size_bits**: AES=128, DES=64, Blowfish=64, Twofish=128
+- **iv_nonce_required**: true for CBC/CTR/GCM/CCM, false for ECB
 
 ## Critical Instructions
 
@@ -319,18 +349,47 @@ For EACH detected algorithm, provide:
 ```json
 [
   {
-    "name": "AES-256",
+    "name": "AES-256-GCM",
     "type": "symmetric",
     "confidence": 0.95,
     "evidence": [
       "AES S-box constants found (0x63, 0x7c, 0x77, 0x7b...)",
-      "Function _aes_sub_bytes at 0x1000",
-      "String: 'AES: Applying S-box substitution'"
+      "Function _aes_gcm_encrypt at 0x1000",
+      "String: 'AES-256-GCM mode'",
+      "Galois field multiplication detected"
     ],
-    "functions": ["_aes_sub_bytes", "_aes_mix_columns"],
-    "locations": ["0x1000", "0x1200"],
+    "functions": ["_aes_gcm_encrypt", "_aes_gcm_decrypt", "_gcm_ghash"],
+    "locations": ["0x1000", "0x1200", "0x1400"],
     "is_proprietary": false,
-    "standard_library": null
+    "standard_library": "OpenSSL",
+    "cipher_characteristics": {
+      "cipher_type": "block",
+      "mode_of_operation": "GCM",
+      "key_size_bits": 256,
+      "block_size_bits": 128,
+      "iv_nonce_required": true
+    }
+  },
+  {
+    "name": "ChaCha20",
+    "type": "symmetric",
+    "confidence": 0.90,
+    "evidence": [
+      "ChaCha quarter-round constants detected",
+      "ARX pattern (Memory/ALU ratio 0.85)",
+      "Function _chacha20_encrypt at 0x2000"
+    ],
+    "functions": ["_chacha20_encrypt", "_chacha20_keysetup"],
+    "locations": ["0x2000", "0x2100"],
+    "is_proprietary": false,
+    "standard_library": "libsodium",
+    "cipher_characteristics": {
+      "cipher_type": "stream",
+      "mode_of_operation": null,
+      "key_size_bits": 256,
+      "block_size_bits": null,
+      "iv_nonce_required": true
+    }
   },
   {
     "name": "SHA-256",
@@ -344,7 +403,14 @@ For EACH detected algorithm, provide:
     "functions": ["_sha256_compress", "_sha256_update"],
     "locations": ["0x3000", "0x3200"],
     "is_proprietary": false,
-    "standard_library": null
+    "standard_library": null,
+    "cipher_characteristics": {
+      "cipher_type": null,
+      "mode_of_operation": null,
+      "key_size_bits": null,
+      "block_size_bits": 512,
+      "iv_nonce_required": false
+    }
   }
 ]
 ```

@@ -40,11 +40,18 @@ Synthesize all stage outputs into a single comprehensive report with 9 sections:
   },
   "detected_algorithms": [
     {
-      "name": "AES-256-CBC",
+      "name": "AES-256-GCM",
       "type": "symmetric",
       "confidence": 0.95,
-      "evidence": ["S-box at 0x1000", "Function _aes_encrypt", "String 'AES encryption'"],
-      "locations": ["0x1000-0x2000"]
+      "evidence": ["S-box at 0x1000", "Function _aes_gcm_encrypt", "String 'AES-256-GCM'", "GHASH multiplication"],
+      "locations": ["0x1000-0x2000"],
+      "cipher_characteristics": {
+        "cipher_type": "block",
+        "mode_of_operation": "GCM",
+        "key_size_bits": 256,
+        "block_size_bits": 128,
+        "iv_nonce_required": true
+      }
     }
   ],
   "detected_functions": [
@@ -138,10 +145,17 @@ Synthesize all stage outputs into a single comprehensive report with 9 sections:
 **Rules:**
 
 - Include ALL algorithms from detection stage
+- **PRESERVE cipher_characteristics field** exactly as provided in Stage 2
 - Sort by confidence (highest first)
 - Merge duplicates (e.g., "AES" and "AES-256" → "AES-256")
+  - When merging, use the more specific cipher_characteristics (prefer "AES-256-GCM" over "AES")
 - type: "symmetric", "asymmetric", "hash", "encoding", "other"
 - evidence: Combine all evidence items (constants + functions + strings)
+
+**Cipher Characteristics Field:**
+- If Stage 2 provided cipher_characteristics, include it in final output
+- Do NOT remove or modify these fields during synthesis
+- If multiple detections have conflicting characteristics, trust the higher confidence detection
 
 ### 3. detected_functions
 
@@ -332,15 +346,23 @@ If custom crypto detected:
   },
   "detected_algorithms": [
     {
-      "name": "AES-256",
+      "name": "AES-256-GCM",
       "type": "symmetric",
       "confidence": 0.95,
       "evidence": [
         "AES S-box constants at 0x1000",
-        "Function _aes_encrypt at 0x1200",
-        "String 'AES encryption' at 0x2000"
+        "Function _aes_gcm_encrypt at 0x1200",
+        "String 'AES-256-GCM' at 0x2000",
+        "GHASH Galois field multiplication at 0x1300"
       ],
-      "locations": ["0x1000-0x1800"]
+      "locations": ["0x1000-0x1800"],
+      "cipher_characteristics": {
+        "cipher_type": "block",
+        "mode_of_operation": "GCM",
+        "key_size_bits": 256,
+        "block_size_bits": 128,
+        "iv_nonce_required": true
+      }
     },
     {
       "name": "SHA-256",
@@ -351,28 +373,50 @@ If custom crypto detected:
         "Function _simple_hash implements rotation patterns",
         "64 round constants detected"
       ],
-      "locations": ["0x3000-0x3400"]
+      "locations": ["0x3000-0x3400"],
+      "cipher_characteristics": {
+        "cipher_type": null,
+        "mode_of_operation": null,
+        "key_size_bits": null,
+        "block_size_bits": 512,
+        "iv_nonce_required": false
+      }
     },
     {
-      "name": "RSA",
+      "name": "RSA-2048",
       "type": "asymmetric",
       "confidence": 0.88,
       "evidence": [
         "Function _rsa_encrypt at 0x4000",
         "Modular exponentiation detected",
-        "String 'RSA key' at 0x5000"
+        "String 'RSA-2048 key' at 0x5000"
       ],
-      "locations": ["0x4000-0x4500"]
+      "locations": ["0x4000-0x4500"],
+      "cipher_characteristics": {
+        "cipher_type": null,
+        "mode_of_operation": null,
+        "key_size_bits": 2048,
+        "block_size_bits": null,
+        "iv_nonce_required": false
+      }
     },
     {
-      "name": "XOR",
+      "name": "ChaCha20",
       "type": "symmetric",
-      "confidence": 0.75,
+      "confidence": 0.85,
       "evidence": [
-        "Function _xor_encrypt at 0x6000",
-        "Simple XOR loop detected"
+        "Function _chacha20_encrypt at 0x6000",
+        "Quarter-round ARX operations",
+        "Nonce handling detected"
       ],
-      "locations": ["0x6000-0x6100"]
+      "locations": ["0x6000-0x6200"],
+      "cipher_characteristics": {
+        "cipher_type": "stream",
+        "mode_of_operation": null,
+        "key_size_bits": 256,
+        "block_size_bits": null,
+        "iv_nonce_required": true
+      }
     }
   ],
   "detected_functions": [

@@ -23,10 +23,20 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 # Suppress Angr's verbose logging
-logging.getLogger('angr').setLevel(logging.CRITICAL)
-logging.getLogger('cle').setLevel(logging.CRITICAL)
-logging.getLogger('pyvex').setLevel(logging.CRITICAL)
-logging.getLogger('cle.backends.macho').setLevel(logging.CRITICAL)
+logging.getLogger('angr').setLevel(logging.ERROR)
+logging.getLogger('cle').setLevel(logging.ERROR)
+logging.getLogger('pyvex').setLevel(logging.ERROR)
+logging.getLogger('archinfo').setLevel(logging.ERROR)
+logging.getLogger('cle.backends').setLevel(logging.ERROR)
+logging.getLogger('cle.backends.macho').setLevel(logging.ERROR)
+logging.getLogger('cle.backends.elf').setLevel(logging.ERROR)
+logging.getLogger('cle.backends.pe').setLevel(logging.ERROR)
+
+# Suppress extremely verbose analysis output
+import sys
+if hasattr(sys.stdout, 'fileno'):
+    # Only suppress if running as service (not in interactive mode)
+    os.environ['ANGR_PROGRESS_DISABLED'] = '1'
 
 # Memory optimization for low-memory instances (512MB)
 gc_threshold = int(os.getenv('GC_THRESHOLD', '50'))

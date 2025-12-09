@@ -5,12 +5,24 @@ Identifies crypto algorithms by their structural patterns (loops, ARX operations
 
 from typing import Dict, Any, List
 import logging
+import os
+import sys
+import io
+from contextlib import contextmanager
+from .angr_loader_helper import load_binary_with_fallback
 
 logger = logging.getLogger(__name__)
+
+# Disable Angr progress bars and verbose output
+os.environ['ANGR_PROGRESS_DISABLED'] = '1'
 
 try:
     import angr
     import claripy
+    # Suppress verbose logging
+    logging.getLogger('angr').setLevel(logging.ERROR)
+    logging.getLogger('cle').setLevel(logging.ERROR)
+    logging.getLogger('pyvex').setLevel(logging.ERROR)
     ANGR_AVAILABLE = True
 except ImportError:
     ANGR_AVAILABLE = False
@@ -21,6 +33,36 @@ try:
     HARDCODED_KEY_DETECTION_AVAILABLE = True
 except ImportError:
     HARDCODED_KEY_DETECTION_AVAILABLE = False
+
+
+@contextmanager
+def suppress_stdout():
+    """Suppress stdout AND stderr to hide Angr's CFGFast progress spam.
+    Uses file descriptor level redirection to catch all output."""
+    import tempfile
+    # Save original file descriptors
+    stdout_fd = sys.stdout.fileno()
+    stderr_fd = sys.stderr.fileno()
+    saved_stdout = os.dup(stdout_fd)
+    saved_stderr = os.dup(stderr_fd)
+    
+    # Redirect to devnull
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.dup2(devnull, stdout_fd)
+        os.dup2(devnull, stderr_fd)
+        yield
+    finally:
+        # Restore original file descriptors
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.dup2(saved_stdout, stdout_fd)
+        os.dup2(saved_stderr, stderr_fd)
+        os.close(saved_stdout)
+        os.close(saved_stderr)
+        os.close(devnull)
     logger.warning("Hardcoded key detection not available")
 
 
@@ -46,14 +88,26 @@ def angr_detect_crypto_patterns(binary_path: str) -> Dict[str, Any]:
             return {"error": "Angr is not available in this environment"}
         
         logger.info(f"Loading binary: {binary_path}")
-        project = angr.Project(binary_path, auto_load_libs=False)
+        project = load_binary_with_fallback(binary_path, auto_load_libs=False)
+        
+        # Check if blob-loaded
+        from .angr_loader_helper import is_blob_loaded
+        is_raw_binary = is_blob_loaded(project)
         
         logger.info("Building CFG...")
-        cfg = project.analyses.CFGFast(
-            normalize=True,
-            force_complete_scan=True  # Important for stripped binaries
-        )
-        logger.info(f"CFG built: {len(cfg.functions)} functions found")
+        with suppress_stdout():
+            cfg = project.analyses.CFGFast(
+                normalize=True,
+                force_complete_scan=False if is_raw_binary else True  # Skip for blobs
+            )
+        
+        func_count = len(cfg.functions)
+        logger.info(f"CFG built: {func_count} functions found")
+        
+        # Aggressive limit for blob binaries
+        max_funcs = 100 if is_raw_binary else 200
+        if is_raw_binary:
+            logger.info(f"   Blob binary detected: will analyze max {max_funcs} functions")
         
         patterns = {
             "round_loops": [],
@@ -72,7 +126,7 @@ def angr_detect_crypto_patterns(binary_path: str) -> Dict[str, Any]:
             cfg.functions.values(),
             key=lambda f: len(list(f.blocks)) if not f.is_simprocedure else 0,
             reverse=True
-        )[:50]  # Analyze top 50 complex functions
+        )[:max_funcs]  # Limit based on binary type
         
         for func in sorted_functions:
             if func.is_simprocedure or func.is_plt:
@@ -982,14 +1036,8 @@ def angr_build_function_groups(binary_path: str) -> Dict[str, Any]:
         if not ANGR_AVAILABLE:
             return {"error": "Angr not available"}
         
-        # CRITICAL FIX: Try normal load first, fallback to blob if needed
-        try:
-            project = angr.Project(binary_path, auto_load_libs=False)
-        except Exception as e:
-            logger.warning(f"Standard loader failed: {e}, trying blob loader...")
-            # Fallback to blob loader for raw binaries
-            project = angr.Project(binary_path, auto_load_libs=False, 
-                                   main_opts={'backend': 'blob', 'arch': 'x86_64'})
+        # Use blob loader fallback helper
+        project = load_binary_with_fallback(binary_path, auto_load_libs=False)
         
         # Limit CFG time to 2 minutes for large binaries (prevents 5-min timeout)
         import signal
@@ -1000,19 +1048,26 @@ def angr_build_function_groups(binary_path: str) -> Dict[str, Any]:
         try:
             signal.signal(signal.SIGALRM, timeout_handler)
             signal.alarm(120)  # 2-minute timeout
-            cfg = project.analyses.CFGFast(normalize=True, force_complete_scan=False)
+            with suppress_stdout():
+                cfg = project.analyses.CFGFast(normalize=True, force_complete_scan=False)
             signal.alarm(0)  # Cancel alarm
         except TimeoutError:
             logger.warning("CFG analysis timed out after 2 minutes, using partial results")
             signal.alarm(0)
-            cfg = project.analyses.CFGFast(normalize=True, force_complete_scan=False)
+            with suppress_stdout():
+                cfg = project.analyses.CFGFast(normalize=True, force_complete_scan=False)
         
         # Build call graph relationships
-        # CRITICAL: Limit to first 500 functions to prevent timeout on huge binaries
+        # CRITICAL: Limit to prevent timeout on huge binaries
+        # Blob binaries get more aggressive limit
+        project = angr.Project(binary_path, auto_load_libs=False, load_debug_info=False)
+        from .angr_loader_helper import is_blob_loaded
+        is_raw_binary = is_blob_loaded(project)
+        
         function_groups = []
         visited = set()
         func_count = 0
-        max_funcs_to_analyze = 500
+        max_funcs_to_analyze = 100 if is_raw_binary else 300  # Aggressive limit for blobs
         
         for func_addr, func in cfg.functions.items():
             func_count += 1

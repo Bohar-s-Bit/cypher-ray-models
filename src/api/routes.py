@@ -39,184 +39,50 @@ def get_pipeline() -> AnalysisPipeline:
     return _pipeline
 
 
-@router.get("/", tags=["Root"])
-async def root():
-    """Root endpoint with API information."""
-    return {
-        "service": "CypherRay",
-        "version": "2.0.0",
-        "description": "AI-powered cryptographic binary analysis system",
-        "endpoints": {
-            "/analyze": "POST - Upload and analyze binary executable",
-            "/health": "GET - Check service health",
-            "/docs": "GET - API documentation"
-        },
-        "status": {
-            "angr_available": check_angr_available(),
-            "anthropic_configured": bool(os.getenv('ANTHROPIC_API_KEY') or os.getenv('ANTRHOPIC_API_KEY'))
-        }
+@router.post("/analyze", tags=["Analysis"], 
+             summary="Analyze Binary File",
+             description="Upload a binary executable file for comprehensive cryptographic analysis")
+async def analyze_binary(
+    file: UploadFile = File(..., description="Binary executable file to analyze"),
+    force_deep: bool = Form(False, description="Skip triage and force deep analysis (default: False)")
+):
+    """
+    🚀 **Analyze Binary Executable for Cryptographic Implementations**
+    
+    Upload a binary file and receive comprehensive cryptographic analysis including:
+    
+    **Analysis Includes:**
+    - 🔐 **Detected Algorithms**: AES, RSA, SHA, DES, RC4, ECC, etc.
+    - 🛡️ **Security Vulnerabilities**: Weak keys, hardcoded secrets, insecure modes
+    - 📡 **Protocol Detection**: TLS, SSH, IPSec, JWT, Kerberos, etc.
+    - 📚 **Library Detection**: OpenSSL, mbedTLS, Bouncy Castle, custom implementations
+    - 📊 **Security Score**: Overall rating (0-10)
+    - 🔍 **Function Analysis**: Detailed crypto function breakdowns
+    - 💡 **XAI Explanations**: Understandable security recommendations
+    
+    **Multi-Stage Pipeline:**
+    1. ⚡ Quick Triage (if force_deep=False) - determines if binary contains crypto
+    2. 🔬 Angr Static Analysis - extracts functions, strings, constants
+    3. 🤖 AI-Powered Synthesis - comprehensive algorithm and vulnerability detection
+    
+    **Parameters:**
+    - **file** (required): Binary executable file (ELF, PE, Mach-O, or raw binary)
+    - **force_deep** (optional): Set to `true` to skip triage and force full analysis
+    
+    **Returns:**
+    ```json
+    {
+      "status": "success",
+      "analysis": {
+        "algorithms": [...],
+        "vulnerabilities": [...],
+        "protocols": [...],
+        "security_score": 7.5,
+        "overall_assessment": "...",
+        ...
+      }
     }
-
-
-@router.get("/health", response_model=HealthResponse, tags=["Health"])
-async def health_check():
-    """Health check endpoint for monitoring and deployment platforms."""
-    angr_available = check_angr_available()
-    anthropic_key_present = bool(os.getenv('ANTHROPIC_API_KEY') or os.getenv('ANTRHOPIC_API_KEY'))
-    
-    health_status = HealthResponse(
-        status="healthy" if (angr_available and anthropic_key_present) else "degraded",
-        angr_available=angr_available,
-        openai_configured=False,  # Deprecated, kept for backwards compatibility
-        anthropic_configured=anthropic_key_present,
-        service="CypherRay ML Service",
-        version="2.0.0"
-    )
-    
-    # Return 503 if critical dependencies are missing
-    if not anthropic_key_present:
-        raise HTTPException(
-            status_code=503,
-            detail="Anthropic API key not configured. Set ANTHROPIC_API_KEY environment variable."
-        )
-    
-    return health_status
-
-
-@router.get("/cost-summary", tags=["Analytics"])
-async def get_cost_summary():
-    """
-    Get cost summary and usage statistics from the orchestrator.
-    Shows API costs by model, provider, token usage, and call statistics.
-    """
-    try:
-        orchestrator = get_orchestrator()
-        summary = orchestrator.get_cost_summary()
-        
-        return {
-            "status": "success",
-            "summary": summary
-        }
-    except Exception as e:
-        logger.error(f"Failed to get cost summary: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get cost summary: {str(e)}")
-
-
-@router.post("/quick-classify", tags=["Analysis"])
-async def quick_classify(file: UploadFile = File(...)):
-    """
-    Quick classification endpoint using cheapest model (GPT-4o-mini).
-    Determines if binary likely contains cryptographic code without deep analysis.
-    
-    Returns:
-    - is_cryptographic: boolean
-    - confidence: 0.0 to 1.0
-    - reasoning: brief explanation
-    - cost: API cost for this call
-    - model_used: which model was used
-    """
-    orchestrator = get_orchestrator()
-    
-    # Read file
-    file_content = await file.read()
-    logger.info(f"Quick classification for: {file.filename} ({len(file_content)} bytes)")
-    
-    # Save to temp file
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as tmp_file:
-        tmp_file.write(file_content)
-        tmp_path = tmp_file.name
-    
-    try:
-        # Run quick metadata extraction
-        if check_angr_available():
-            from src.tools.angr_metadata import angr_analyze_binary_metadata
-            from src.tools.angr_strings import angr_analyze_strings
-            
-            metadata = angr_analyze_binary_metadata(tmp_path)
-            strings_data = angr_analyze_strings(tmp_path)
-            
-            context = {
-                "filename": file.filename,
-                "size": len(file_content),
-                "architecture": metadata.get("architecture", "unknown"),
-                "crypto_strings": strings_data.get("crypto_related_strings", [])[:10]
-            }
-        else:
-            context = {
-                "filename": file.filename,
-                "size": len(file_content)
-            }
-        
-        query = """
-Based on the binary metadata and strings, quickly classify if this binary likely contains cryptographic implementations.
-
-Respond in JSON format:
-{
-  "is_cryptographic": true/false,
-  "confidence": 0.0-1.0,
-  "reasoning": "brief explanation",
-  "indicators": ["list", "of", "indicators"]
-}
-"""
-        
-        # Use orchestrator for quick classification
-        result = await orchestrator.analyze(
-            query=query,
-            context=context,
-            analysis_type='quick_classify'
-        )
-        
-        # Parse JSON response
-        try:
-            classification = json.loads(result['content'])
-        except json.JSONDecodeError:
-            # Try to extract JSON from markdown
-            content = result['content']
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            classification = json.loads(content)
-        
-        return {
-            "status": "success",
-            "classification": classification,
-            "metadata": {
-                "model_used": result['model'],
-                "provider": result['provider'],
-                "cost": result['cost'],
-                "duration": result['duration']
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Quick classification failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
-
-
-@router.post("/analyze", tags=["Analysis"])
-async def analyze_binary(file: UploadFile = File(...), force_deep: bool = Form(False)):
-    """
-    🚀 Analyze binary executable using intelligent multi-stage pipeline.
-    
-    This endpoint uses a cost-optimized 3-stage approach:
-    1. Quick triage (Claude Haiku) - determines if binary is cryptographic
-    2. Angr extraction - static analysis of binary 
-    3. LLM synthesis (model selected based on complexity) - comprehensive analysis
-    
-    - **file**: Binary executable file
-    - **force_deep**: Skip triage and force deep analysis (default: False)
-    
-    Returns comprehensive cryptographic analysis with:
-    - Detected algorithms (AES, RSA, SHA, etc.)
-    - Security vulnerabilities and recommendations
-    - Protocol analysis (TLS, SSH, IPSec)
-    - Library detection (OpenSSL, mbedTLS, custom)
-    - Security score (0-10)
-    - XAI explanations
+    ```
     """
     pipeline = get_pipeline()
     

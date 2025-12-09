@@ -1,17 +1,21 @@
 """
 Orchestrator-based Analysis Pipeline
 Intelligent multi-stage analysis using cost-optimized model selection.
+Enhanced with YARA scanning, complexity filtering, and intelligent batching.
 """
 
 import json
 import time
 import tempfile
 import os
+import asyncio
 from typing import Dict, Any, List
 from pathlib import Path
 
 from src.models.multi_model_orchestrator import MultiModelOrchestrator
 from src.core.angr_tools import check_angr_available
+from src.detectors.yara_detector import YaraDetector, yara_scan_binary
+from src.utils.token_batcher import TokenBatcher
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -30,13 +34,26 @@ class AnalysisPipeline:
         self.orchestrator = orchestrator
         self.angr_available = check_angr_available()
         
+        # Initialize YARA detector
+        try:
+            self.yara_detector = YaraDetector()
+            logger.info("✅ YARA detector initialized")
+        except Exception as e:
+            logger.warning(f"YARA detector initialization failed: {e}")
+            self.yara_detector = None
+        
+        # Initialize token batcher
+        self.token_batcher = TokenBatcher()
+        logger.info("✅ Token batcher initialized")
+        
     async def run_quick_triage(self, binary_path: str, filename: str) -> Dict[str, Any]:
         """
         Stage 1: Quick triage using specialized modular prompt.
         Determines if binary is worth deep analysis.
+        Enhanced with parallel protocol detection for faster triage.
         
         Returns:
-            Dict with is_crypto_likely, confidence, reasoning
+            Dict with is_crypto_likely, confidence, reasoning, and detected protocols
         """
         logger.info(f"Stage 1: Quick triage for {filename}")
         
@@ -46,16 +63,31 @@ class AnalysisPipeline:
         # Gather minimal context
         context = {"filename": filename, "size": os.path.getsize(binary_path)}
         
+        # Run metadata, strings, and protocol detection in parallel
+        protocol_data = None
         if self.angr_available:
             from src.tools.angr_metadata import angr_analyze_binary_metadata
             from src.tools.angr_strings import angr_analyze_strings
             
-            metadata = angr_analyze_binary_metadata(binary_path)
-            strings = angr_analyze_strings(binary_path)
+            # Parallel execution of metadata and string extraction
+            metadata_task = asyncio.create_task(
+                asyncio.to_thread(angr_analyze_binary_metadata, binary_path)
+            )
+            strings_task = asyncio.create_task(
+                asyncio.to_thread(angr_analyze_strings, binary_path)
+            )
+            
+            # Get results
+            metadata, strings = await asyncio.gather(metadata_task, strings_task)
+            
+            # Quick protocol detection from strings
+            crypto_strings = strings.get("crypto_related_strings", [])
+            protocol_data = self._detect_protocols_from_strings(crypto_strings)
             
             context.update({
                 "architecture": metadata.get("architecture"),
-                "crypto_strings": strings.get("crypto_related_strings", [])[:10]
+                "crypto_strings": crypto_strings[:10],
+                "detected_protocols": protocol_data.get("protocols", [])
             })
         
         query = f"""
@@ -113,18 +145,15 @@ Now classify this binary according to the instructions above. Respond ONLY with 
         # Extract metadata
         try:
             results['metadata'] = angr_analyze_binary_metadata(binary_path)
-            logger.info("✅ Metadata extracted")
+            # Check if metadata extraction failed (Angr returns {"error": "..."} on failure)
+            if 'error' in results['metadata']:
+                logger.error(f"❌ Metadata extraction failed: {results['metadata']['error']}")
+                results['metadata'] = {}  # Clear error dict
+            else:
+                logger.info("✅ Metadata extracted")
         except Exception as e:
             logger.error(f"Metadata extraction failed: {e}")
             results['metadata'] = {}
-        
-        # Extract functions
-        try:
-            results['functions'] = angr_extract_functions(binary_path, limit=100)
-            logger.info(f"✅ Extracted {len(results['functions'].get('functions', []))} functions")
-        except Exception as e:
-            logger.error(f"Function extraction failed: {e}")
-            results['functions'] = {}
         
         # Analyze strings
         try:
@@ -134,51 +163,140 @@ Now classify this binary according to the instructions above. Respond ONLY with 
             logger.error(f"String analysis failed: {e}")
             results['strings'] = {}
         
+        # **PHASE 2.5: YARA SCANNING** - Additional layer of crypto signature detection
+        yara_results = None
+        yara_function_map = {}
+        if self.yara_detector:
+            try:
+                logger.info("Starting YARA signature scanning...")
+                yara_results = self.yara_detector.scan_binary(binary_path)
+                
+                if yara_results.get('scan_successful'):
+                    summary = yara_results['summary']
+                    logger.info(f"✅ YARA scan complete: {summary['total_rules_matched']} rules matched")
+                    logger.info(f"   Algorithms detected: {summary['algorithms']}")
+                    logger.info(f"   Crypto confidence: {summary['crypto_confidence']}")
+                    
+                    results['yara'] = yara_results
+                else:
+                    logger.warning(f"YARA scan failed: {yara_results.get('error')}")
+            except Exception as e:
+                logger.error(f"❌ YARA scanning failed: {e}", exc_info=True)
+                results['yara'] = {"error": str(e)}
+        else:
+            logger.info("⚠️  YARA detector not available, skipping signature scanning")
+        
+        # **PHASE 2.5: YARA SCANNING** - Additional layer of crypto signature detection
+        yara_results = None
+        yara_function_map = {}
+        if self.yara_detector:
+            try:
+                logger.info("Starting YARA signature scanning...")
+                yara_results = self.yara_detector.scan_binary(binary_path)
+                
+                if yara_results.get('scan_successful'):
+                    summary = yara_results['summary']
+                    logger.info(f"✅ YARA scan complete: {summary['total_rules_matched']} rules matched")
+                    logger.info(f"   Algorithms detected: {summary['algorithms']}")
+                    logger.info(f"   Crypto confidence: {summary['crypto_confidence']}")
+                    
+                    results['yara'] = yara_results
+                else:
+                    logger.warning(f"YARA scan failed: {yara_results.get('error')}")
+            except Exception as e:
+                logger.error(f"❌ YARA scanning failed: {e}", exc_info=True)
+                results['yara'] = {"error": str(e)}
+        else:
+            logger.info("⚠️  YARA detector not available, skipping signature scanning")
+        
         # Detect constants (ENHANCED)
         try:
             results['constants'] = angr_detect_crypto_constants(binary_path)
-            const_count = len(results['constants'].get('detected_constants', []))
-            logger.info(f"✅ Found {const_count} crypto constants")
-            if results['constants'].get('algorithm_groups'):
-                logger.info(f"   Algorithm hints: {list(results['constants']['algorithm_groups'].keys())}")
+            if 'error' in results['constants']:
+                logger.error(f"❌ Constant detection failed: {results['constants']['error']}")
+                results['constants'] = {'detected_constants': []}
+            else:
+                const_count = len(results['constants'].get('detected_constants', []))
+                logger.info(f"✅ Found {const_count} crypto constants")
+                if results['constants'].get('algorithm_groups'):
+                    logger.info(f"   Algorithm hints: {list(results['constants']['algorithm_groups'].keys())}")
         except Exception as e:
             logger.error(f"Constant detection failed: {e}")
-            results['constants'] = {}
+            results['constants'] = {'detected_constants': []}
+        
+        # Extract functions (WITH YARA TAG INTEGRATION and COMPLEXITY FILTERING)
+        try:
+            # Pass YARA results to function extraction for tag association
+            results['functions'] = angr_extract_functions(
+                binary_path,
+                limit=100,
+                min_complexity=None,  # Uses env var MIN_FUNCTION_COMPLEXITY
+                yara_tags=yara_function_map  # Will be populated if YARA found matches
+            )
+            
+            # Check if function extraction failed
+            if 'error' in results['functions']:
+                logger.error(f"❌ Function extraction failed: {results['functions']['error']}")
+                results['functions'] = {'functions': []}  # Provide empty list instead of error dict
+            else:
+                logger.info(f"✅ Extracted {len(results['functions'].get('functions', []))} functions")
+                
+                # Log filtering stats
+                if 'filtered_count' in results['functions']:
+                    logger.info(f"   Filtered {results['functions']['filtered_count']} low-complexity functions")
+                    logger.info(f"   Complexity threshold: {results['functions'].get('min_complexity_threshold', 3)}")
+                    
+                # Log if adaptive retry was used
+                if results['functions'].get('adaptive_retry'):
+                    logger.info(f"   ✅ Adaptive retry enabled (lowered threshold to extract functions)")
+        except Exception as e:
+            logger.error(f"Function extraction failed: {e}")
+            results['functions'] = {'functions': []}
         
         # Detect crypto patterns (NEW)
         try:
             logger.info("Starting crypto pattern detection...")
             results['patterns'] = angr_detect_crypto_patterns(binary_path)
-            pattern_summary = results['patterns'].get('pattern_summary', {})
-            logger.info(f"✅ Pattern detection complete")
-            logger.info(f"   Round loops: {pattern_summary.get('round_loops_found', 0)}")
-            logger.info(f"   ARX operations: {pattern_summary.get('arx_operations_found', 0)}")
-            logger.info(f"   Table lookups: {pattern_summary.get('table_lookups_found', 0)}")
             
-            if results['patterns'].get('inferred_algorithms'):
-                logger.info(f"   Inferred algorithms: {[a['algorithm'] for a in results['patterns']['inferred_algorithms'][:3]]}")
+            if 'error' in results['patterns']:
+                logger.error(f"❌ Pattern detection failed: {results['patterns']['error']}")
+                results['patterns'] = {'pattern_summary': {}, 'inferred_algorithms': []}
             else:
-                logger.warning("   ⚠️  No algorithms inferred from patterns")
+                pattern_summary = results['patterns'].get('pattern_summary', {})
+                logger.info(f"✅ Pattern detection complete")
+                logger.info(f"   Round loops: {pattern_summary.get('round_loops_found', 0)}")
+                logger.info(f"   ARX operations: {pattern_summary.get('arx_operations_found', 0)}")
+                logger.info(f"   Table lookups: {pattern_summary.get('table_lookups_found', 0)}")
+                
+                if results['patterns'].get('inferred_algorithms'):
+                    logger.info(f"   Inferred algorithms: {[a['algorithm'] for a in results['patterns']['inferred_algorithms'][:3]]}")
+                else:
+                    logger.warning("   ⚠️  No algorithms inferred from patterns")
         except Exception as e:
             logger.error(f"❌ Pattern detection failed: {e}", exc_info=True)
-            results['patterns'] = {"error": str(e)}
+            results['patterns'] = {'pattern_summary': {}, 'inferred_algorithms': []}
         
         # Analyze data flow (NEW)
         try:
             logger.info("Starting dataflow analysis...")
             results['dataflow'] = angr_analyze_dataflow(binary_path)
-            dataflow_summary = results['dataflow'].get('summary', {})
-            crypto_score = results['dataflow'].get('crypto_likelihood_score', 0)
-            logger.info(f"✅ Dataflow analysis complete")
-            logger.info(f"   XOR chains: {dataflow_summary.get('xor_chains_found', 0)}")
-            logger.info(f"   Bit rotations: {dataflow_summary.get('rotations_found', 0)}")
-            logger.info(f"   Crypto likelihood: {crypto_score:.2f}")
             
-            if crypto_score < 0.3:
-                logger.warning(f"   ⚠️  Low crypto likelihood score: {crypto_score:.2f}")
+            if 'error' in results['dataflow']:
+                logger.error(f"❌ Dataflow analysis failed: {results['dataflow']['error']}")
+                results['dataflow'] = {'summary': {}, 'crypto_likelihood_score': 0}
+            else:
+                dataflow_summary = results['dataflow'].get('summary', {})
+                crypto_score = results['dataflow'].get('crypto_likelihood_score', 0)
+                logger.info(f"✅ Dataflow analysis complete")
+                logger.info(f"   XOR chains: {dataflow_summary.get('xor_chains_found', 0)}")
+                logger.info(f"   Bit rotations: {dataflow_summary.get('rotations_found', 0)}")
+                logger.info(f"   Crypto likelihood: {crypto_score:.2f}")
+                
+                if crypto_score < 0.3:
+                    logger.warning(f"   ⚠️  Low crypto likelihood score: {crypto_score:.2f}")
         except Exception as e:
             logger.error(f"❌ Dataflow analysis failed: {e}", exc_info=True)
-            results['dataflow'] = {"error": str(e)}
+            results['dataflow'] = {'summary': {}, 'crypto_likelihood_score': 0}
         
         # Build function groups for cross-function aggregation (NEW for stripped binaries)
         try:
@@ -288,6 +406,7 @@ Now detect all cryptographic algorithms according to the instructions above. Res
         """
         Stage 4: Function analysis using specialized modular prompt.
         Analyzes crypto functions in detail.
+        Enhanced with intelligent batching for large binaries with 100+ functions.
         
         Returns:
             Dict with function analysis results
@@ -298,8 +417,83 @@ Now detect all cryptographic algorithms according to the instructions above. Res
         func_prompt = self._load_prompt("prompts/3_function_analysis.md")
         
         optimized = self._optimize_angr_data(angr_results)
+        functions = optimized.get('functions', {}).get('functions', [])
         
-        query = f"""
+        # Check if we need batching
+        total_functions = len(functions)
+        if total_functions == 0:
+            logger.warning("No functions to analyze")
+            return {
+                'functions': [],
+                'cost': 0,
+                'model': 'none'
+            }
+        
+        # Estimate if batching is needed
+        sample_data = {
+            "algorithms": detected_algorithms,
+            "functions": functions[:5]  # Sample
+        }
+        estimated_tokens = self.token_batcher.estimate_tokens_from_dict(sample_data)
+        needs_batching = total_functions > 50 or self.token_batcher.should_batch(estimated_tokens * (total_functions / 5))
+        
+        if needs_batching:
+            logger.info(f"📦 Batching {total_functions} functions for analysis...")
+            all_analyzed_functions = []
+            total_cost = 0.0
+            batch_num = 0
+            
+            # Batch the functions
+            for batch in self.token_batcher.batch_functions(functions):
+                batch_num += 1
+                batch_info = batch['batch_info']
+                batch_functions = batch['functions']
+                
+                logger.info(
+                    f"   Batch {batch_info['batch_number']}/{batch_info['total_batches']}: "
+                    f"{batch_info['functions_in_batch']} functions "
+                    f"(~{batch_info['estimated_tokens']} tokens)"
+                )
+                
+                query = f"""
+{func_prompt}
+
+=== INPUT DATA ===
+
+Detected Algorithms: {json.dumps(detected_algorithms, indent=2)}
+
+Functions (Batch {batch_info['batch_number']}/{batch_info['total_batches']}): {json.dumps({'functions': batch_functions}, indent=2)}
+
+Strings: {json.dumps(optimized.get('crypto_strings', []))}
+
+=== END INPUT DATA ===
+
+Now analyze all crypto-related functions in this batch according to the instructions above. Respond ONLY with valid JSON array.
+"""
+                
+                result = await self.orchestrator.analyze(
+                    query=query,
+                    context={"algorithms": detected_algorithms, "functions": batch_functions},
+                    analysis_type='main_analysis'
+                )
+                
+                batch_functions_analyzed = self._parse_json_response(result['content'], f"Stage 4: Function Analysis (Batch {batch_num})")
+                all_analyzed_functions.extend(batch_functions_analyzed if isinstance(batch_functions_analyzed, list) else [])
+                total_cost += result['cost']
+            
+            logger.info(f"✅ Analyzed {len(all_analyzed_functions)} functions across {batch_num} batches")
+            
+            return {
+                'functions': all_analyzed_functions,
+                'cost': total_cost,
+                'model': 'batched-analysis',
+                'batches': batch_num
+            }
+        else:
+            # Single query for all functions
+            logger.info(f"Analyzing {total_functions} functions in single query")
+            
+            query = f"""
 {func_prompt}
 
 === INPUT DATA ===
@@ -314,21 +508,21 @@ Strings: {json.dumps(optimized.get('crypto_strings', []))}
 
 Now analyze all crypto-related functions according to the instructions above. Respond ONLY with valid JSON array.
 """
-        
-        result = await self.orchestrator.analyze(
-            query=query,
-            context={"algorithms": detected_algorithms, "functions": optimized.get('functions', {})},
-            analysis_type='main_analysis'
-        )
-        
-        functions = self._parse_json_response(result['content'], "Stage 4: Function Analysis")
-        logger.info(f"✅ Analyzed {len(functions) if isinstance(functions, list) else 0} functions")
-        
-        return {
-            'functions': functions,
-            'cost': result['cost'],
-            'model': result['model']
-        }
+            
+            result = await self.orchestrator.analyze(
+                query=query,
+                context={"algorithms": detected_algorithms, "functions": optimized.get('functions', {})},
+                analysis_type='main_analysis'
+            )
+            
+            functions_analyzed = self._parse_json_response(result['content'], "Stage 4: Function Analysis")
+            logger.info(f"✅ Analyzed {len(functions_analyzed) if isinstance(functions_analyzed, list) else 0} functions")
+            
+            return {
+                'functions': functions_analyzed,
+                'cost': result['cost'],
+                'model': result['model']
+            }
     
     async def run_vulnerability_scan(
         self,
@@ -590,6 +784,41 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
             'duration': result['duration']
         }
         
+        # **CRITICAL FIX**: Force correct file metadata from Angr (Claude sometimes returns "not_computed" for size)
+        if 'metadata' in angr_results and angr_results['metadata'] and 'error' not in angr_results['metadata']:
+            angr_meta = angr_results['metadata']
+            if 'file_metadata' not in final_report or not final_report['file_metadata']:
+                final_report['file_metadata'] = {}
+            
+            # Override with actual Angr values (prevent "not_computed" strings in numeric fields)
+            file_type_value = angr_meta.get('file_type', final_report['file_metadata'].get('format', 'unknown'))
+            final_report['file_metadata']['file_type'] = file_type_value  # Backend checks this first
+            final_report['file_metadata']['format'] = file_type_value      # Also set format for compatibility
+            final_report['file_metadata']['architecture'] = angr_meta.get('architecture', final_report['file_metadata'].get('architecture', 'unknown'))
+            final_report['file_metadata']['size'] = angr_meta.get('size_bytes', final_report['file_metadata'].get('size_bytes', 0))
+            final_report['file_metadata']['size_bytes'] = angr_meta.get('size_bytes', final_report['file_metadata'].get('size_bytes', 0))
+            final_report['file_metadata']['md5'] = angr_meta.get('md5', final_report['file_metadata'].get('md5', 'not_computed'))
+            final_report['file_metadata']['sha1'] = angr_meta.get('sha1', final_report['file_metadata'].get('sha1', 'not_computed'))
+            final_report['file_metadata']['sha256'] = angr_meta.get('sha256', final_report['file_metadata'].get('sha256', 'not_computed'))
+            final_report['file_metadata']['stripped'] = final_report['file_metadata'].get('stripped', False)
+            
+            logger.info(f"✅ Injected Angr metadata: {file_type_value} ({angr_meta.get('size_bytes')} bytes)")
+        else:
+            logger.warning("⚠️ Angr metadata unavailable, using Claude's inferred values")
+            # Ensure file_metadata exists with defaults
+            if 'file_metadata' not in final_report:
+                final_report['file_metadata'] = {
+                    'file_type': 'unknown',
+                    'format': 'unknown',
+                    'architecture': 'unknown',
+                    'size': 0,
+                    'size_bytes': 0,
+                    'md5': 'not_computed',
+                    'sha1': 'not_computed',
+                    'sha256': 'not_computed',
+                    'stripped': False
+                }
+        
         logger.info(f"✅ Final synthesis complete (${result['cost']:.6f})")
         return final_report
     
@@ -728,6 +957,16 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
         if 'constants' in angr_results:
             optimized['constants'] = angr_results['constants']
         
+        # **NEW: Include YARA scan results (Phase 2.5)**
+        if 'yara' in angr_results and angr_results['yara'].get('scan_successful'):
+            yara_data = angr_results['yara']
+            optimized['yara'] = {
+                'summary': yara_data.get('summary', {}),
+                'detections': yara_data.get('detections', [])[:20],  # Limit to top 20 detections
+                'crypto_confidence': yara_data.get('summary', {}).get('crypto_confidence', 0)
+            }
+            logger.info(f"✅ Included YARA results: {yara_data['summary']['total_rules_matched']} matches")
+        
         # **CRITICAL: Include crypto patterns (ARX operations, inferred algorithms)**
         if 'patterns' in angr_results:
             patterns_data = angr_results['patterns']
@@ -851,15 +1090,58 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
         
         return aggregated
     
+    def _detect_protocols_from_strings(self, crypto_strings: List[str]) -> Dict[str, Any]:
+        """
+        Quick protocol detection from extracted strings for triage.
+        
+        Args:
+            crypto_strings: List of crypto-related strings
+            
+        Returns:
+            Dict with detected protocols and evidence
+        """
+        protocols = []
+        evidence = []
+        
+        # Protocol patterns
+        protocol_patterns = {
+            "TLS": ["TLS", "SSL", "ClientHello", "ServerHello", "HandshakeType"],
+            "SSH": ["SSH", "ssh-rsa", "ssh-ed25519", "OpenSSH"],
+            "HTTPS": ["HTTPS", "HTTP/1.1", "Content-Type"],
+            "IPSec": ["IPSec", "ESP", "AH", "IKE"],
+            "OpenVPN": ["OpenVPN", "tun", "tap"],
+            "WireGuard": ["WireGuard", "Curve25519"],
+            "Signal": ["Signal", "X3DH", "Double Ratchet"],
+            "PGP/GPG": ["PGP", "GPG", "OpenPGP"],
+        }
+        
+        # Check each pattern
+        for protocol, keywords in protocol_patterns.items():
+            for keyword in keywords:
+                for string in crypto_strings:
+                    if keyword.lower() in string.lower():
+                        if protocol not in protocols:
+                            protocols.append(protocol)
+                        evidence.append(f"Found '{keyword}' in binary strings")
+                        break
+        
+        return {
+            "protocols": protocols,
+            "evidence": evidence[:10],  # Limit evidence
+            "count": len(protocols)
+        }
+    
     def _parse_json_response(self, content: str, stage_name: str = "unknown") -> Any:
         """
         Parse JSON from LLM response with multiple repair strategies.
         
         Strategies:
         1. Direct parsing
-        2. Extract from markdown code blocks
-        3. Repair common JSON errors (trailing commas, unescaped quotes)
-        4. Regex extraction as last resort
+        2. Strip text before JSON (AI often adds explanations before the JSON)
+        3. Extract from markdown code blocks
+        4. Extract JSON before any explanation text
+        5. Repair common JSON errors (trailing commas, unescaped quotes)
+        6. Regex extraction as last resort
         
         Args:
             content: LLM response content
@@ -874,11 +1156,91 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
         try:
             return json.loads(content)
         except json.JSONDecodeError as e:
-            logger.warning(f"Direct JSON parse failed in {stage_name}: {e}")
-            logger.warning(f"AI response was: {content[:500]}...")  # Show first 500 chars
+            # If error is "Extra data" it means JSON is valid but has text after it
+            if "Extra data" in str(e):
+                # Extract just the JSON part (before the extra text)
+                try:
+                    content_stripped = content.strip()
+                    
+                    # First, find where JSON actually starts (skip any prefix text)
+                    first_bracket = content_stripped.find('[')
+                    first_brace = content_stripped.find('{')
+                    json_start = -1
+                    
+                    if first_bracket != -1 and first_brace != -1:
+                        json_start = min(first_bracket, first_brace)
+                    elif first_bracket != -1:
+                        json_start = first_bracket
+                    elif first_brace != -1:
+                        json_start = first_brace
+                    
+                    if json_start > 0:
+                        content_stripped = content_stripped[json_start:]
+                    
+                    # Now find where valid JSON ends
+                    if content_stripped.startswith('['):
+                        # Find the closing bracket
+                        bracket_count = 0
+                        for i, char in enumerate(content_stripped):
+                            if char == '[':
+                                bracket_count += 1
+                            elif char == ']':
+                                bracket_count -= 1
+                                if bracket_count == 0:
+                                    # Found the end of the array
+                                    json_only = content_stripped[:i+1]
+                                    parsed = json.loads(json_only)
+                                    logger.info(f"Successfully parsed JSON with 'Extra data' handling in {stage_name}")
+                                    return parsed
+                    elif content_stripped.startswith('{'):
+                        # Find the closing brace
+                        brace_count = 0
+                        for i, char in enumerate(content_stripped):
+                            if char == '{':
+                                brace_count += 1
+                            elif char == '}':
+                                brace_count -= 1
+                                if brace_count == 0:
+                                    # Found the end of the object
+                                    json_only = content_stripped[:i+1]
+                                    parsed = json.loads(json_only)
+                                    logger.info(f"Successfully parsed JSON with 'Extra data' handling in {stage_name}")
+                                    return parsed
+                except Exception as parse_error:
+                    logger.debug(f"Extra data handling failed: {parse_error}")
+            
+            logger.debug(f"Direct JSON parse failed in {stage_name}: {e}")
         
-        # Strategy 2: Extract from markdown code blocks
+        # Strategy 2: Strip explanatory text BEFORE JSON (common AI behavior)
+        # AI often writes: "I'll analyze the functions:\n\n[\n  {...}\n]"
         cleaned_content = content.strip()
+        
+        # Find the first [ or { that starts the JSON
+        first_bracket = cleaned_content.find('[')
+        first_brace = cleaned_content.find('{')
+        
+        # Determine which comes first (or if neither exists)
+        json_start = -1
+        if first_bracket != -1 and first_brace != -1:
+            json_start = min(first_bracket, first_brace)
+        elif first_bracket != -1:
+            json_start = first_bracket
+        elif first_brace != -1:
+            json_start = first_brace
+        
+        # If we found a JSON start, try parsing from there
+        if json_start > 0:  # Only if there's text BEFORE the JSON
+            try:
+                cleaned_content = cleaned_content[json_start:]
+                parsed = json.loads(cleaned_content)
+                logger.info(f"Successfully parsed JSON after stripping prefix in {stage_name}")
+                return parsed
+            except json.JSONDecodeError as e:
+                logger.debug(f"Prefix stripping didn't help in {stage_name}: {e}")
+                # Restore for next strategies
+                cleaned_content = content.strip()
+        
+        # Strategy 3: Extract from markdown code blocks
         if "```json" in cleaned_content:
             cleaned_content = cleaned_content.split("```json")[1].split("```")[0].strip()
         elif "```" in cleaned_content:
@@ -887,7 +1249,7 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
         
         try:
             parsed = json.loads(cleaned_content)
-            logger.info(f"Successfully parsed JSON from {stage_name}")
+            logger.info(f"Successfully parsed JSON from markdown in {stage_name}")
             return parsed
         except json.JSONDecodeError as e:
             logger.warning(f"Markdown extraction failed in {stage_name}: {e}")

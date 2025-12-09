@@ -259,6 +259,14 @@ Strings like "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384" → TLS protocol
 
 ## Output Format
 
+**CRITICAL: RETURN ONLY THE JSON ARRAY - NO EXPLANATIONS, NO MARKDOWN, NO PREAMBLE**
+
+✅ Correct: `[{"protocol":"TLS",...}]`
+
+❌ Wrong: `Based on the algorithms, I detected: [{"protocol":"TLS",...}]`
+
+**Your response must start with `[` and contain nothing before or after the JSON array.**
+
 For EACH detected protocol:
 
 ```json
