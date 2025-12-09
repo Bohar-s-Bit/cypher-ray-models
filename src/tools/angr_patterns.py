@@ -94,11 +94,12 @@ def angr_detect_crypto_patterns(binary_path: str) -> Dict[str, Any]:
         from .angr_loader_helper import is_blob_loaded
         is_raw_binary = is_blob_loaded(project)
         
-        logger.info("Building CFG...")
+        logger.info("Building CFG (fast mode)...")
         with suppress_stdout():
             cfg = project.analyses.CFGFast(
                 normalize=True,
-                force_complete_scan=False if is_raw_binary else True  # Skip for blobs
+                force_complete_scan=False,  # Faster analysis - always false
+                resolve_indirect_jumps=False  # Skip expensive operations
             )
         
         func_count = len(cfg.functions)

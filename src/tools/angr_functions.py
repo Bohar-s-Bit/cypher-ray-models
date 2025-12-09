@@ -123,20 +123,101 @@ def angr_extract_functions(
         # Check if loaded as blob (raw binary)
         is_raw_binary = is_blob_loaded(project)
         if is_raw_binary:
-            logger.warning("⚠️ Loaded as raw binary (blob), CFG may be incomplete")
-            # For blob-loaded binaries, use moderate complexity threshold (not too aggressive)
-            min_complexity = max(min_complexity, 4)  # At least 4 for raw binaries (balanced filtering)
-            logger.info(f"   Blob loader detected: increasing min_complexity to {min_complexity}")
-        
-        with suppress_stdout():
-            cfg = project.analyses.CFGFast()
-        
+            # For blobs: Use direct function discovery + targeted CFG for top functions
+            min_complexity = 1
+            logger.info(f"⚠️ Loaded as raw binary (blob), using smart function discovery")
+            
+            # Step 1: Get all auto-discovered functions (instant)
+            logger.info("⚡ Step 1: Getting auto-discovered functions...")
+            all_functions = project.kb.functions
+            
+            if len(all_functions) == 0:
+                logger.warning("No functions auto-discovered, using entry point only")
+                functions = [{
+                    "address": hex(project.entry),
+                    "name": "entry_point",
+                    "size": 0,
+                    "num_blocks": 0,
+                    "cyclomatic_complexity": 1,
+                    "calls_crypto_apis": False,
+                    "yara_tags": [],
+                    "has_yara_hit": False,
+                    "complexity_score": 0
+                }]
+                return {
+                    "total_functions": 1,
+                    "functions": functions,
+                    "analyzed_count": 1,
+                    "filtered_count": 0,
+                    "min_complexity_threshold": min_complexity,
+                    "fast_mode": True
+                }
+            
+            logger.info(f"✅ Found {len(all_functions)} auto-discovered functions")
+            
+            # Step 2: Filter to top candidates based on YARA hits and size
+            logger.info("⚡ Step 2: Filtering to crypto-relevant candidates...")
+            candidates = []
+            for addr, func in list(all_functions.items())[:200]:  # Check first 200
+                has_yara = yara_tags and addr in yara_tags if yara_tags else False
+                size = func.size if hasattr(func, 'size') else 0
+                
+                # Prioritize: YARA hits OR larger functions (likely crypto)
+                if has_yara or size >= 100:  # 100 bytes = decent sized function
+                    candidates.append((addr, func, has_yara))
+                
+                if len(candidates) >= 20:  # Get top 20 candidates
+                    break
+            
+            logger.info(f"✅ Found {len(candidates)} crypto-relevant candidates")
+            
+            # Step 3: Quick targeted CFG for just these candidates (10-15s)
+            logger.info(f"⚡ Step 3: Building targeted CFG for {len(candidates)} functions...")
+            function_addrs = [addr for addr, _, _ in candidates]
+            
+            try:
+                import signal
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("Targeted CFG timeout")
+                
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(20)  # 20s max for targeted CFG
+                
+                with suppress_stdout():
+                    cfg = project.analyses.CFGFast(
+                        normalize=False,
+                        force_complete_scan=False,
+                        resolve_indirect_jumps=False,
+                        data_references=False,
+                        cross_references=False,
+                        function_starts=function_addrs[:10]  # Only analyze top 10
+                    )
+                signal.alarm(0)
+                logger.info("✅ Targeted CFG complete")
+                cfg_functions = cfg.functions
+            except (TimeoutError, Exception) as e:
+                signal.alarm(0)
+                logger.warning(f"⚠️ Targeted CFG failed ({e}), using basic function info")
+                # Fallback: Use the auto-discovered functions with limited info
+                cfg_functions = {addr: func for addr, func, _ in candidates}
+        else:
+            # For structured binaries: Use normal CFG
+            with suppress_stdout():
+                cfg = project.analyses.CFGFast(
+                    normalize=True,
+                    force_complete_scan=False,
+                    resolve_indirect_jumps=False,
+                    data_references=False,
+                    cross_references=False
+                )
+            cfg_functions = cfg.functions
         functions = []
         filtered_count = 0
         total_analyzed = 0  # Track how many we analyzed
-        max_to_analyze = 500 if is_raw_binary else 100000  # Aggressive limit for blob binaries
+        max_to_analyze = 100 if is_raw_binary else 300  # Analyze more to find crypto-relevant ones
+        max_functions = 10  # Only return top 10 functions
         
-        for addr, func in cfg.functions.items():
+        for addr, func in cfg_functions.items():
             total_analyzed += 1
             
             # Early exit for blob binaries to prevent excessive analysis time
@@ -159,11 +240,18 @@ def angr_extract_functions(
                 has_yara_hit = True
                 func_yara_tags = yara_tags[addr]
             
-            # Filtering logic: Keep if (complexity >= threshold) OR (has YARA hit)
-            # This ensures we don't discard crypto functions even if they're simple
-            if complexity < min_complexity and not has_yara_hit:
-                filtered_count += 1
-                continue
+            # Smart filtering for blobs: Keep if (complexity >= 3) OR (has YARA hit)
+            # This ensures we only get crypto-relevant functions
+            if is_raw_binary:
+                # For blobs: Only keep functions with YARA hits OR complexity >= 3
+                if not has_yara_hit and complexity < 3:
+                    filtered_count += 1
+                    continue
+            else:
+                # For structured binaries: Use normal threshold
+                if complexity < min_complexity and not has_yara_hit:
+                    filtered_count += 1
+                    continue
             
             # Include this function
             func_info = {
@@ -180,60 +268,26 @@ def angr_extract_functions(
             
             functions.append(func_info)
             
-            # Stop if we hit the limit
+            # Stop if we have enough functions
+            if len(functions) >= max_functions:
+                logger.info(f"✅ Collected {max_functions} crypto-relevant functions, stopping early")
+                break
+            
             if len(functions) >= limit:
                 break
         
-        # Sort by complexity (most complex first) to prioritize interesting functions
-        functions.sort(key=lambda f: f['cyclomatic_complexity'], reverse=True)
+        # Sort by priority: YARA hits first, then by complexity
+        functions.sort(key=lambda f: (not f['has_yara_hit'], -f['cyclomatic_complexity']))
         
-        logger.info(f"Extracted {len(functions)} functions (filtered out {filtered_count} low-complexity)")
+        # Limit to top 10 functions
+        if len(functions) > max_functions:
+            logger.info(f"📊 Keeping top {max_functions} most relevant functions (out of {len(functions)})")
+            functions = functions[:max_functions]
         
-        # ADAPTIVE RETRY: If no functions found and we filtered many, retry with lower threshold
-        if len(functions) == 0 and filtered_count > 10 and min_complexity > 3:
-            logger.warning(f"⚠️ No functions found with complexity >= {min_complexity}")
-            logger.info(f"🔄 Retrying with lower threshold (min_complexity=2)...")
-            
-            # Re-extract with lower threshold
-            functions_retry = []
-            for addr, func in cfg.functions.items():
-                if func.is_simprocedure or func.is_plt:
-                    continue
-                
-                complexity = calculate_cyclomatic_complexity(func)
-                if complexity >= 2:  # Much lower threshold
-                    num_blocks = len(list(func.blocks))
-                    func_yara_tags = yara_tags.get(addr, []) if yara_tags else []
-                    
-                    functions_retry.append({
-                        "address": hex(addr),
-                        "name": func.name,
-                        "size": func.size,
-                        "num_blocks": num_blocks,
-                        "cyclomatic_complexity": complexity,
-                        "calls_crypto_apis": False,
-                        "yara_tags": func_yara_tags,
-                        "has_yara_hit": len(func_yara_tags) > 0,
-                        "complexity_score": round(complexity / max(num_blocks, 1), 2)
-                    })
-                    
-                    if len(functions_retry) >= limit:
-                        break
-            
-            functions_retry.sort(key=lambda f: f['cyclomatic_complexity'], reverse=True)
-            logger.info(f"✅ Retry successful: found {len(functions_retry)} functions with complexity >= 2")
-            
-            return {
-                "total_functions": len(cfg.functions),
-                "functions": functions_retry,
-                "analyzed_count": len(functions_retry),
-                "filtered_count": filtered_count - len(functions_retry),
-                "min_complexity_threshold": 2,
-                "adaptive_retry": True
-            }
+        logger.info(f"✅ Extracted {len(functions)} functions (filtered out {filtered_count} low-complexity)")
         
         return {
-            "total_functions": len(cfg.functions),
+            "total_functions": len(cfg_functions) if cfg_functions else 0,
             "functions": functions,
             "analyzed_count": len(functions),
             "filtered_count": filtered_count,

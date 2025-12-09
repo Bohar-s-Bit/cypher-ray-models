@@ -119,6 +119,7 @@ For EACH crypto function, provide **DETAILED** analysis:
 ```
 
 **IMPORTANT: related_algorithm MUST be a STRING, not an array!**
+
 - If function relates to ONE algorithm: `"related_algorithm": "AES-256"`
 - If function relates to MULTIPLE algorithms: `"related_algorithm": "SHA-256, AES-128/AES-256, ChaCha20"`
 - If no specific algorithm: `"related_algorithm": null`
@@ -236,11 +237,13 @@ For EACH crypto function, provide **DETAILED** analysis:
 **RETURN ONLY THE JSON ARRAY - NO EXPLANATIONS, NO MARKDOWN, NO PREAMBLE**
 
 ✅ Correct:
+
 ```
 [{"name":"sub_401000",...}]
 ```
 
 ❌ Wrong:
+
 ```
 Based on the analysis, I'll focus on these functions:
 [{"name":"sub_401000",...}]

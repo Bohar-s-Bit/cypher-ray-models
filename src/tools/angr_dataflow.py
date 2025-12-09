@@ -82,15 +82,16 @@ def angr_analyze_dataflow(binary_path: str) -> Dict[str, Any]:
         from .angr_loader_helper import is_blob_loaded
         is_raw_binary = is_blob_loaded(project)
         
-        logger.info("Building CFG for dataflow...")
+        logger.info("Building CFG for dataflow (fast mode)...")
         with suppress_stdout():
             cfg = project.analyses.CFGFast(
                 normalize=True,
-                force_complete_scan=False if is_raw_binary else True  # Skip complete scan for blobs
+                force_complete_scan=False,  # Always fast mode
+                resolve_indirect_jumps=False  # Skip expensive operations
             )
         
-        func_count = len(cfg.functions)
-        logger.info(f"CFG built: {func_count} functions found")
+        func_count = min(len(cfg.functions), 50)  # Hard limit to 50 functions
+        logger.info(f"CFG built: {func_count} functions (speed optimized)")
         
         # For blob binaries, analyze even fewer functions (aggressive optimization)
         top_n = 10 if is_raw_binary else 30

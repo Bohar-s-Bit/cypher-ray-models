@@ -168,8 +168,20 @@ Now classify this binary according to the instructions above. Respond ONLY with 
         yara_function_map = {}
         if self.yara_detector:
             try:
-                logger.info("Starting YARA signature scanning...")
-                yara_results = self.yara_detector.scan_binary(binary_path)
+                logger.info("Starting YARA signature scanning (60s max timeout)...")
+                import signal
+                
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("YARA scan exceeded 60s timeout")
+                
+                # Set 60s timeout for YARA (critical - don't compromise)
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(60)  # 60 second timeout
+                
+                try:
+                    yara_results = self.yara_detector.scan_binary(binary_path)
+                finally:
+                    signal.alarm(0)  # Cancel alarm
                 
                 if yara_results.get('scan_successful'):
                     summary = yara_results['summary']
@@ -186,32 +198,12 @@ Now classify this binary according to the instructions above. Respond ONLY with 
         else:
             logger.info("⚠️  YARA detector not available, skipping signature scanning")
         
-        # **PHASE 2.5: YARA SCANNING** - Additional layer of crypto signature detection
-        yara_results = None
-        yara_function_map = {}
-        if self.yara_detector:
-            try:
-                logger.info("Starting YARA signature scanning...")
-                yara_results = self.yara_detector.scan_binary(binary_path)
-                
-                if yara_results.get('scan_successful'):
-                    summary = yara_results['summary']
-                    logger.info(f"✅ YARA scan complete: {summary['total_rules_matched']} rules matched")
-                    logger.info(f"   Algorithms detected: {summary['algorithms']}")
-                    logger.info(f"   Crypto confidence: {summary['crypto_confidence']}")
-                    
-                    results['yara'] = yara_results
-                else:
-                    logger.warning(f"YARA scan failed: {yara_results.get('error')}")
-            except Exception as e:
-                logger.error(f"❌ YARA scanning failed: {e}", exc_info=True)
-                results['yara'] = {"error": str(e)}
-        else:
-            logger.info("⚠️  YARA detector not available, skipping signature scanning")
-        
-        # Detect constants (ENHANCED)
+        # Detect constants (DISABLED FOR SPEED)
         try:
-            results['constants'] = angr_detect_crypto_constants(binary_path)
+            logger.info("⚡ Skipping constant detection (disabled for speed)")
+            results['constants'] = {'detected_constants': [], 'skipped': True}
+            if False:  # Disabled
+                results['constants'] = angr_detect_crypto_constants(binary_path)
             if 'error' in results['constants']:
                 logger.error(f"❌ Constant detection failed: {results['constants']['error']}")
                 results['constants'] = {'detected_constants': []}
@@ -226,13 +218,26 @@ Now classify this binary according to the instructions above. Respond ONLY with 
         
         # Extract functions (WITH YARA TAG INTEGRATION and COMPLEXITY FILTERING)
         try:
-            # Pass YARA results to function extraction for tag association
-            results['functions'] = angr_extract_functions(
-                binary_path,
-                limit=100,
-                min_complexity=None,  # Uses env var MIN_FUNCTION_COMPLEXITY
-                yara_tags=yara_function_map  # Will be populated if YARA found matches
-            )
+            logger.info("Starting function extraction (120s max timeout)...")
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Function extraction exceeded 120s timeout")
+            
+            # Set 120s timeout for function extraction
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(120)  # 120 second timeout
+            
+            try:
+                # Pass YARA results to function extraction for tag association
+                results['functions'] = angr_extract_functions(
+                    binary_path,
+                    limit=30,  # ⚡ ULTRA FAST: Only 30 most complex functions
+                    min_complexity=None,  # Uses env var MIN_FUNCTION_COMPLEXITY
+                    yara_tags=yara_function_map  # Will be populated if YARA found matches
+                )
+            finally:
+                signal.alarm(0)  # Cancel alarm
             
             # Check if function extraction failed
             if 'error' in results['functions']:
@@ -253,10 +258,12 @@ Now classify this binary according to the instructions above. Respond ONLY with 
             logger.error(f"Function extraction failed: {e}")
             results['functions'] = {'functions': []}
         
-        # Detect crypto patterns (NEW)
+        # Detect crypto patterns (DISABLED FOR SPEED - saves 30+ seconds)
         try:
-            logger.info("Starting crypto pattern detection...")
-            results['patterns'] = angr_detect_crypto_patterns(binary_path)
+            logger.info("⚡ Skipping pattern detection (disabled for speed)")
+            results['patterns'] = {'pattern_summary': {}, 'inferred_algorithms': [], 'skipped': True}
+            if False:  # Disabled
+                results['patterns'] = angr_detect_crypto_patterns(binary_path)
             
             if 'error' in results['patterns']:
                 logger.error(f"❌ Pattern detection failed: {results['patterns']['error']}")
@@ -276,10 +283,12 @@ Now classify this binary according to the instructions above. Respond ONLY with 
             logger.error(f"❌ Pattern detection failed: {e}", exc_info=True)
             results['patterns'] = {'pattern_summary': {}, 'inferred_algorithms': []}
         
-        # Analyze data flow (NEW)
+        # Analyze data flow (DISABLED FOR SPEED - saves 20+ seconds)
         try:
-            logger.info("Starting dataflow analysis...")
-            results['dataflow'] = angr_analyze_dataflow(binary_path)
+            logger.info("⚡ Skipping dataflow analysis (disabled for speed)")
+            results['dataflow'] = {'summary': {}, 'crypto_likelihood_score': 0, 'skipped': True}
+            if False:  # Disabled
+                results['dataflow'] = angr_analyze_dataflow(binary_path)
             
             if 'error' in results['dataflow']:
                 logger.error(f"❌ Dataflow analysis failed: {results['dataflow']['error']}")
@@ -298,11 +307,13 @@ Now classify this binary according to the instructions above. Respond ONLY with 
             logger.error(f"❌ Dataflow analysis failed: {e}", exc_info=True)
             results['dataflow'] = {'summary': {}, 'crypto_likelihood_score': 0}
         
-        # Build function groups for cross-function aggregation (NEW for stripped binaries)
+        # Build function groups (DISABLED FOR SPEED - saves 15+ seconds)
         try:
-            logger.info("Building function call graph for aggregation...")
-            from src.tools.angr_patterns import angr_build_function_groups
-            results['function_groups'] = angr_build_function_groups(binary_path)
+            logger.info("⚡ Skipping function groups (disabled for speed)")
+            results['function_groups'] = {'total_groups': 0, 'skipped': True}
+            if False:  # Disabled
+                from src.tools.angr_patterns import angr_build_function_groups
+                results['function_groups'] = angr_build_function_groups(binary_path)
             group_count = results['function_groups'].get('total_groups', 0)
             largest_group = results['function_groups'].get('largest_group_size', 0)
             logger.info(f"✅ Found {group_count} function groups (largest: {largest_group} functions)")
@@ -429,13 +440,13 @@ Now detect all cryptographic algorithms according to the instructions above. Res
                 'model': 'none'
             }
         
-        # Estimate if batching is needed
+        # Estimate if batching is needed (reduced threshold for speed)
         sample_data = {
             "algorithms": detected_algorithms,
             "functions": functions[:5]  # Sample
         }
         estimated_tokens = self.token_batcher.estimate_tokens_from_dict(sample_data)
-        needs_batching = total_functions > 50 or self.token_batcher.should_batch(estimated_tokens * (total_functions / 5))
+        needs_batching = total_functions > 25 or self.token_batcher.should_batch(estimated_tokens * (total_functions / 5))
         
         if needs_batching:
             logger.info(f"📦 Batching {total_functions} functions for analysis...")
@@ -491,7 +502,7 @@ Now analyze all crypto-related functions in this batch according to the instruct
             }
         else:
             # Single query for all functions
-            logger.info(f"Analyzing {total_functions} functions in single query")
+            logger.info(f"⚡ Fast mode: analyzing {total_functions} functions in single query")
             
             query = f"""
 {func_prompt}

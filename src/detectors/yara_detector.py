@@ -76,8 +76,8 @@ class YaraDetector:
             }
         
         try:
-            # Scan the binary file
-            matches = self.rules.match(binary_path)
+            # Scan the binary file with 45s timeout
+            matches = self.rules.match(binary_path, timeout=45)
             
             # Process matches
             detections = []

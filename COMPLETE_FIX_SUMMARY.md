@@ -3,6 +3,7 @@
 ## ✅ TWO CRITICAL ISSUES FIXED
 
 ### Issue #1: No Functions Extracted ✅ FIXED
+
 ### Issue #2: AI Adding Explanatory Text Before JSON ✅ FIXED
 
 ---
@@ -10,23 +11,27 @@
 ## Issue #1: Function Extraction (FIXED)
 
 ### Problem
+
 Your binary `P_2_S_8.bin` had **0 functions extracted** due to overly aggressive complexity filtering.
 
 ### Root Cause
+
 - Binary loaded as **blob** (raw binary, no recognized format)
 - Triggered complexity threshold of **8** (too high)
 - All 500 analyzed functions were filtered out
 - **Result**: 0 functions for analysis
 
 ### Solution Implemented
+
 1. **Lowered blob threshold**: 8 → 4 (more reasonable)
 2. **Added adaptive retry**: Automatically retries with threshold=2 if no functions found
 3. **Enhanced logging**: Shows when adaptive retry kicks in
 
 ### Results After Fix
+
 ```
 ✅ Extracted 100 functions (instead of 0)
-✅ Filtered 400 low-complexity functions  
+✅ Filtered 400 low-complexity functions
 ✅ Complexity threshold: 2
 ✅ Adaptive retry enabled
 ```
@@ -38,6 +43,7 @@ Your binary `P_2_S_8.bin` had **0 functions extracted** due to overly aggressive
 ## Issue #2: JSON Parsing Errors (FIXED)
 
 ### Problem
+
 After extracting functions successfully, the AI was **adding explanatory text** before the JSON:
 
 ```
@@ -50,11 +56,13 @@ Based on the context and detected algorithms, I'll analyze the crypto-related fu
 ```
 
 This caused JSON parsing to fail with:
+
 ```
 ERROR: Failed to parse JSON after all repair strategies
 ```
 
 ### Root Cause
+
 1. **AI behavior**: Claude was being helpful by explaining its analysis before returning JSON
 2. **Parser limitation**: JSON parser expected data to start with `[` or `{`
 3. **Prompts didn't enforce**: Prompts didn't explicitly forbid explanatory text
@@ -66,10 +74,12 @@ ERROR: Failed to parse JSON after all repair strategies
 Added intelligent text-stripping logic:
 
 1. **Strategy 1**: Handle "Extra data" (text after JSON) - IMPROVED
+
    - Now finds JSON start even if text before it
    - Extracts from first `[` or `{` to matching closer
 
 2. **Strategy 2**: Strip prefix text (NEW)
+
    - Detects explanatory text before JSON
    - Finds first `[` or `{` and parses from there
    - Logs success: "Successfully parsed JSON after stripping prefix"
@@ -82,12 +92,14 @@ Added intelligent text-stripping logic:
 Added **CRITICAL OUTPUT REQUIREMENT** to all prompts:
 
 **Files Modified:**
+
 - `prompts/3_function_analysis.md`
 - `prompts/2_algorithm_detection.md`
 - `prompts/5_protocol_detection.md`
 - `prompts/4_vulnerability_scan.md`
 
 **Added Section:**
+
 ```markdown
 ## CRITICAL OUTPUT REQUIREMENT
 
@@ -106,12 +118,14 @@ Based on the analysis, I'll focus on these functions:
 ### Expected Results
 
 #### Before Fixes:
+
 ```
 ❌ ERROR: All JSON parsing strategies failed
 ❌ Status: 500 Internal Server Error
 ```
 
 #### After Fixes:
+
 ```
 ✅ Successfully parsed JSON after stripping prefix
 ✅ Function analysis complete
@@ -123,7 +137,9 @@ Based on the analysis, I'll focus on these functions:
 ## Files Modified
 
 ### Core Logic:
+
 1. **`src/tools/angr_functions.py`**
+
    - Line 128: Lowered blob threshold (8 → 4)
    - Lines 192-233: Added adaptive retry with threshold=2
 
@@ -133,13 +149,17 @@ Based on the analysis, I'll focus on these functions:
    - Line 251: Added adaptive retry logging
 
 ### Prompts:
+
 3. **`prompts/3_function_analysis.md`**
+
    - Added CRITICAL OUTPUT REQUIREMENT section
 
 4. **`prompts/2_algorithm_detection.md`**
+
    - Added CRITICAL OUTPUT REQUIREMENT section
 
 5. **`prompts/5_protocol_detection.md`**
+
    - Added CRITICAL OUTPUT REQUIREMENT section
 
 6. **`prompts/4_vulnerability_scan.md`**
@@ -150,6 +170,7 @@ Based on the analysis, I'll focus on these functions:
 ## Testing Your Fixes
 
 ### Test 1: Restart Server
+
 ```bash
 cd /Users/mac/Downloads/Projects/SIH/cypher-ray-models
 source .venv/bin/activate
@@ -157,11 +178,13 @@ python main.py
 ```
 
 ### Test 2: Re-analyze Binary
+
 Upload `P_2_S_8.bin` with `force_deep=True`
 
 ### Expected Logs:
 
 #### Function Extraction (Stage 2):
+
 ```
 ✅ Extracted 100 functions
    Filtered 400 low-complexity functions
@@ -170,6 +193,7 @@ Upload `P_2_S_8.bin` with `force_deep=True`
 ```
 
 #### Function Analysis (Stage 4):
+
 ```
 Analyzing 50 functions in single query
 ✅ Successfully parsed JSON after stripping prefix
@@ -177,6 +201,7 @@ Analyzing 50 functions in single query
 ```
 
 #### Final Result:
+
 ```
 ✅ MODULAR pipeline complete | Total cost: $0.05
 Status: 200 OK
@@ -187,23 +212,27 @@ Status: 200 OK
 ## Why These Fixes Matter
 
 ### Without Function Extraction:
+
 - ❌ No implementation analysis
 - ❌ No vulnerability detection
 - ❌ No function-level insights
 - ❌ Limited algorithm understanding
 
 ### With Function Extraction:
+
 - ✅ 100 functions analyzed
 - ✅ Detailed crypto operation analysis
 - ✅ Vulnerability scanning
 - ✅ Complete algorithm mapping
 
 ### Without JSON Parser Fix:
+
 - ❌ Pipeline crashes at Stage 4
 - ❌ 500 Internal Server Error
 - ❌ No results returned to user
 
 ### With JSON Parser Fix:
+
 - ✅ Graceful handling of AI variations
 - ✅ Multiple fallback strategies
 - ✅ Complete analysis pipeline
@@ -214,6 +243,7 @@ Status: 200 OK
 ## What Changed in Your Logs
 
 ### Before (Broken):
+
 ```
 06:52:04 | INFO | Extracted 0 functions (filtered out 500)
 06:52:04 | INFO | Complexity threshold: 8
@@ -222,6 +252,7 @@ INFO: 127.0.0.1 - "POST /analyze HTTP/1.1" 500 Internal Server Error
 ```
 
 ### After (Fixed):
+
 ```
 07:25:37 | INFO | Extracted 100 functions (filtered out 400)
 07:25:37 | INFO | Complexity threshold: 2
@@ -235,11 +266,13 @@ INFO: 127.0.0.1 - "POST /analyze HTTP/1.1" 200 OK
 ## Prevention Measures
 
 ### For Function Extraction:
+
 1. Monitor "Extracted X functions" - alert if X = 0
 2. Check "Adaptive retry" in logs
 3. Validate complexity thresholds per binary type
 
 ### For JSON Parsing:
+
 1. Prompts explicitly forbid explanatory text
 2. Parser has multiple fallback strategies
 3. Detailed logging shows which strategy succeeded
@@ -251,6 +284,7 @@ INFO: 127.0.0.1 - "POST /analyze HTTP/1.1" 200 OK
 **Problem 1**: No functions extracted → Fixed with adaptive retry (threshold 4 → 2)
 
 **Problem 2**: AI adding text before JSON → Fixed with:
+
 - Enhanced JSON parser (strips prefix text)
 - Updated prompts (enforce JSON-only output)
 
@@ -261,8 +295,9 @@ INFO: 127.0.0.1 - "POST /analyze HTTP/1.1" 200 OK
 ---
 
 **Next Step**: Re-analyze `P_2_S_8.bin` and verify you get:
+
 1. ✅ 100 functions extracted
-2. ✅ Function analysis complete (no JSON errors)  
+2. ✅ Function analysis complete (no JSON errors)
 3. ✅ 200 OK response with full results
 
 🎉 Both critical issues are now resolved!

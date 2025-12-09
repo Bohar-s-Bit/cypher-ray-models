@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"high\",\n    \"algorithm\": \"SHA-1\",\n    \"description\": \"SHA-1 is deprecated due to collision vulnerabilities. It should not be used for digital signatures or integrity verification.\",\n    \"evidence\": \"SHA-1 initialization vectors found at 0xaec0, 0xaec8, 0xaec4, 0xaecc, 0xaed0\",\n    \"recommendation\": \"Replace SHA-1 with SHA-256 or SHA-3 for all security-critical applications\"\n  },\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"high\", \n    \"algorithm\": \"MD5\",\n    \"description\": \"MD5 is deprecated due to significant collision vulnerabilities. It is considered cryptographically broken and unsafe for security purposes.\",\n    \"evidence\": \"MD5 initialization constants found at 0xaec0, 0xaec8, 0xaec4, 0xaecc\",\n    \"recommendation\": \"Replace MD5 with SHA-256 or SHA-3 for all hashing requirements\"\n  },\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"critical\",\n    \"algorithm\": \"RC4\",\n    \"description\": \"RC4 is a deprecated stream cipher with known biases in its keystream that can lead to practical attacks.\",\n    \"evidence\": \"RC4 initialization pattern at 0x144202, Key scheduling algorithm (KSA) pattern at 0x1c5\",\n    \"recommendation\": \"Replace RC4 with modern stream ciphers like ChaCha20 or use AES in CTR mode\"\n  },\n  {\n    \"type\": \"weak_key_size\",\n    \"severity\": \"critical\",\n    \"algorithm\": \"RSA\",\n    \"description\": \"RSA implementation uses a weak key size of 1024 bits, which is vulnerable to factorization attacks.\",\n    \"evidence\": \"RSA/ECC modulus detected at 0x9 with length 129 (1024-bit key)\",\n    \"recommendation\": \"Upgrade to RSA-2048 or RSA-4096 key sizes. Consider using elliptic curve cryptography (ECC) with curves like Curve25519\"\n  }\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 10471,
+      "output_tokens": 547,
+      "total_tokens": 11018
+    },
+    "cost": 0.010564800000000001,
+    "duration": 10.804769039154053
+  },
+  "timestamp": 1765265283.701631,
+  "ttl": 86400,
+  "created_at": "2025-12-09T12:58:03.701631"
+}
