@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n  {\n    \"name\": \"AES-128-ECB\",\n    \"type\": \"symmetric\",\n    \"confidence\": 0.85,\n    \"evidence\": [\n      \"Inferred algorithm: AES or DES (S-box based cipher)\",\n      \"S-box pattern with 22 table accesses\",\n      \"OpenSSL AES-128-ECB Test string detected\",\n      \"Symmetric cipher with SPN structure\"\n    ],\n    \"functions\": [\"_main\"],\n    \"locations\": [\"0x100000500\"],\n    \"is_proprietary\": false,\n    \"standard_library\": \"OpenSSL\",\n    \"cipher_characteristics\": {\n      \"cipher_type\": \"block\",\n      \"mode_of_operation\": \"ECB\",\n      \"key_size_bits\": 128,\n      \"block_size_bits\": 128,\n      \"iv_nonce_required\": false\n    }\n  },\n  {\n    \"name\": \"RC4\",\n    \"type\": \"symmetric\",\n    \"confidence\": 0.6,\n    \"evidence\": [\n      \"YARA rule 'RC4_Initialization' detected\",\n      \"RC4 stream cipher initialization pattern found at offset 0x589\"\n    ],\n    \"functions\": [],\n    \"locations\": [\"0x589\"],\n    \"is_proprietary\": false,\n    \"standard_library\": null,\n    \"cipher_characteristics\": {\n      \"cipher_type\": \"stream\",\n      \"mode_of_operation\": null,\n      \"key_size_bits\": null,\n      \"block_size_bits\": null,\n      \"iv_nonce_required\": false\n    }\n  },\n  {\n    \"name\": \"XOR Cipher\",\n    \"type\": \"symmetric\",\n    \"confidence\": 0.5,\n    \"evidence\": [\n      \"YARA rule 'Cryptographic_XOR_Loops' detected\",\n      \"XOR encryption/decryption loops found at offsets 0x791 and 0x178\"\n    ],\n    \"functions\": [],\n    \"locations\": [\"0x791\", \"0x178\"],\n    \"is_proprietary\": false,\n    \"standard_library\": null,\n    \"cipher_characteristics\": {\n      \"cipher_type\": null,\n      \"mode_of_operation\": null,\n      \"key_size_bits\": null,\n      \"block_size_bits\": null,\n      \"iv_nonce_required\": false\n    }\n  },\n  {\n    \"name\": \"PBKDF2\",\n    \"type\": \"kdf\",\n    \"confidence\": 0.7,\n    \"evidence\": [\n      \"YARA rule 'PBKDF2_KDF' detected\",\n      \"Key derivation function counter pattern found at offset 0x41\"\n    ],\n    \"functions\": [],\n    \"locations\": [\"0x41\"],\n    \"is_proprietary\": false,\n    \"standard_library\": null,\n    \"cipher_characteristics\": {\n      \"cipher_type\": null,\n      \"mode_of_operation\": null,\n      \"key_size_bits\": null,\n      \"block_size_bits\": null,\n      \"iv_nonce_required\": false\n    }\n  },\n  {\n    \"name\": \"RSA/ECC\",\n    \"type\": \"asymmetric\",\n    \"confidence\": 0.7,\n    \"evidence\": [\n      \"YARA rule 'RSA_ECC_Primes' detected\",\n      \"Well-known RSA/ECC curve parameters found at offset 0x5\"\n    ],\n    \"functions\": [],\n    \"locations\": [\"0x5\"],\n    \"is_proprietary\": false,\n    \"standard_library\": null,\n    \"cipher_characteristics\": {\n      \"cipher_type\": null,\n      \"mode_of_operation\": null,\n      \"key_size_bits\": null,\n      \"block_size_bits\": null,\n      \"iv_nonce_required\": false\n    }\n  }\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 8548,
+      "output_tokens": 970,
+      "total_tokens": 9518
+    },
+    "cost": 0.0107184,
+    "duration": 13.170705795288086
+  },
+  "timestamp": 1765281208.398437,
+  "ttl": 86400,
+  "created_at": "2025-12-09T17:23:28.398439"
+}

@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"high\",\n    \"algorithm\": \"SHA-1\",\n    \"description\": \"SHA-1 is deprecated due to collision vulnerabilities and is no longer considered cryptographically secure for signatures or integrity checks.\",\n    \"evidence\": \"SHA-1 initialization vectors detected at 0x1468\",\n    \"recommendation\": \"Replace SHA-1 with SHA-256 or SHA-3 for all cryptographic purposes\"\n  },\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"critical\",\n    \"algorithm\": \"MD5\",\n    \"description\": \"MD5 is deprecated and critically vulnerable to collision attacks. It should not be used for any cryptographic security purposes.\",\n    \"evidence\": \"MD5 initialization constants detected at 0x1468\",\n    \"recommendation\": \"Immediately replace MD5 with SHA-256 or SHA-3 for all hashing needs\"\n  },\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"critical\", \n    \"algorithm\": \"RC4\",\n    \"description\": \"RC4 stream cipher is deprecated due to significant biases in its keystream that can lead to practical attacks.\",\n    \"evidence\": \"RC4 Key Scheduling Algorithm (KSA) pattern found at 0x0c95\",\n    \"recommendation\": \"Replace RC4 with modern stream ciphers like ChaCha20 or use authenticated encryption modes\"\n  },\n  {\n    \"type\": \"hardcoded_secret\",\n    \"severity\": \"critical\",\n    \"algorithm\": \"DES\",\n    \"description\": \"Multiple hardcoded 8-byte keys or IVs detected in binary's constant section, exposing potential encryption secrets.\",\n    \"evidence\": \"10 hardcoded 8-byte candidates found in __TEXT,__const section at offsets 0x100001368-0x100001371\",\n    \"extracted_value\": \"Multiple 8-byte hex sequences including 78a46ad756b7c7e8\",\n    \"recommendation\": \"Remove hardcoded keys, use secure key management systems, implement key rotation\"\n  },\n  {\n    \"type\": \"weak_key_size\",\n    \"severity\": \"high\",\n    \"algorithm\": \"RSA\",\n    \"description\": \"Potential weak RSA implementation with low operation complexity suggesting insufficient key generation\",\n    \"evidence\": \"Modular arithmetic with low complexity (MUL:35, DIV:7, SHIFT:19)\",\n    \"recommendation\": \"Use RSA-2048 or RSA-4096, verify key generation uses cryptographically secure random number generation\"\n  }\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 13042,
+      "output_tokens": 624,
+      "total_tokens": 13666
+    },
+    "cost": 0.012929600000000001,
+    "duration": 13.309759855270386
+  },
+  "timestamp": 1765281618.944936,
+  "ttl": 86400,
+  "created_at": "2025-12-09T17:30:18.944936"
+}

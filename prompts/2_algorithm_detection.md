@@ -274,14 +274,6 @@ Strings explicitly naming algorithms:
 
 ## Output Format
 
-**CRITICAL: RETURN ONLY THE JSON ARRAY - NO EXPLANATIONS, NO MARKDOWN, NO PREAMBLE**
-
-✅ Correct: `[{"algorithm":"AES",...}]`
-
-❌ Wrong: `Based on analysis: [{"algorithm":"AES",...}]`
-
-**Your response must start with `[` and contain nothing before or after the JSON array.**
-
 For EACH detected algorithm, provide:
 
 ```json
@@ -309,8 +301,7 @@ For EACH detected algorithm, provide:
 ```
 
 **Cipher Characteristics Rules:**
-
-- **cipher_type**:
+- **cipher_type**: 
   - "block" for AES, DES, 3DES, Blowfish, Twofish, IDEA, Camellia
   - "stream" for RC4, ChaCha20, Salsa20
   - "sponge" for SHA-3/Keccak
@@ -374,7 +365,7 @@ For EACH detected algorithm, provide:
   {
     "name": "ChaCha20",
     "type": "symmetric",
-    "confidence": 0.9,
+    "confidence": 0.90,
     "evidence": [
       "ChaCha quarter-round constants detected",
       "ARX pattern (Memory/ALU ratio 0.85)",

@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n  {\n    \"type\": \"hardcoded_secret\",\n    \"severity\": \"critical\",\n    \"algorithm\": \"AES\",\n    \"description\": \"Multiple hardcoded key/IV candidates detected in binary's constant section, exposing potential encryption secrets\",\n    \"evidence\": \"16-byte key candidate found in __TEXT,__const section at offset 0x1000012b1\",\n    \"extracted_value\": \"7c777bf26b6fc530\",\n    \"recommendation\": \"Remove hardcoded keys, use secure key management system like KMS or derive keys dynamically\"\n  },\n  {\n    \"type\": \"hardcoded_secret\",\n    \"severity\": \"critical\", \n    \"algorithm\": \"DES\",\n    \"description\": \"Multiple 8-byte hardcoded key/IV candidates detected, indicating potential weak cryptographic secret storage\",\n    \"evidence\": \"8-byte key candidates found in __TEXT,__const section with low entropy (3.0)\",\n    \"extracted_value\": \"Multiple 8-byte sequences from 0x1000012b2 to 0x1000012ba\",\n    \"recommendation\": \"Immediately replace hardcoded keys with secure key derivation techniques\"\n  }\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 10257,
+      "output_tokens": 286,
+      "total_tokens": 10543
+    },
+    "cost": 0.0093496,
+    "duration": 8.187026023864746
+  },
+  "timestamp": 1765281704.751847,
+  "ttl": 86400,
+  "created_at": "2025-12-09T17:31:44.751847"
+}

@@ -168,20 +168,8 @@ Now classify this binary according to the instructions above. Respond ONLY with 
         yara_function_map = {}
         if self.yara_detector:
             try:
-                logger.info("Starting YARA signature scanning (60s max timeout)...")
-                import signal
-                
-                def timeout_handler(signum, frame):
-                    raise TimeoutError("YARA scan exceeded 60s timeout")
-                
-                # Set 60s timeout for YARA (critical - don't compromise)
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(60)  # 60 second timeout
-                
-                try:
-                    yara_results = self.yara_detector.scan_binary(binary_path)
-                finally:
-                    signal.alarm(0)  # Cancel alarm
+                logger.info("Starting YARA signature scanning...")
+                yara_results = self.yara_detector.scan_binary(binary_path)
                 
                 if yara_results.get('scan_successful'):
                     summary = yara_results['summary']
@@ -198,12 +186,32 @@ Now classify this binary according to the instructions above. Respond ONLY with 
         else:
             logger.info("⚠️  YARA detector not available, skipping signature scanning")
         
-        # Detect constants (DISABLED FOR SPEED)
+        # **PHASE 2.5: YARA SCANNING** - Additional layer of crypto signature detection
+        yara_results = None
+        yara_function_map = {}
+        if self.yara_detector:
+            try:
+                logger.info("Starting YARA signature scanning...")
+                yara_results = self.yara_detector.scan_binary(binary_path)
+                
+                if yara_results.get('scan_successful'):
+                    summary = yara_results['summary']
+                    logger.info(f"✅ YARA scan complete: {summary['total_rules_matched']} rules matched")
+                    logger.info(f"   Algorithms detected: {summary['algorithms']}")
+                    logger.info(f"   Crypto confidence: {summary['crypto_confidence']}")
+                    
+                    results['yara'] = yara_results
+                else:
+                    logger.warning(f"YARA scan failed: {yara_results.get('error')}")
+            except Exception as e:
+                logger.error(f"❌ YARA scanning failed: {e}", exc_info=True)
+                results['yara'] = {"error": str(e)}
+        else:
+            logger.info("⚠️  YARA detector not available, skipping signature scanning")
+        
+        # Detect constants (ENHANCED)
         try:
-            logger.info("⚡ Skipping constant detection (disabled for speed)")
-            results['constants'] = {'detected_constants': [], 'skipped': True}
-            if False:  # Disabled
-                results['constants'] = angr_detect_crypto_constants(binary_path)
+            results['constants'] = angr_detect_crypto_constants(binary_path)
             if 'error' in results['constants']:
                 logger.error(f"❌ Constant detection failed: {results['constants']['error']}")
                 results['constants'] = {'detected_constants': []}
@@ -218,26 +226,13 @@ Now classify this binary according to the instructions above. Respond ONLY with 
         
         # Extract functions (WITH YARA TAG INTEGRATION and COMPLEXITY FILTERING)
         try:
-            logger.info("Starting function extraction (120s max timeout)...")
-            import signal
-            
-            def timeout_handler(signum, frame):
-                raise TimeoutError("Function extraction exceeded 120s timeout")
-            
-            # Set 120s timeout for function extraction
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(120)  # 120 second timeout
-            
-            try:
-                # Pass YARA results to function extraction for tag association
-                results['functions'] = angr_extract_functions(
-                    binary_path,
-                    limit=30,  # ⚡ ULTRA FAST: Only 30 most complex functions
-                    min_complexity=None,  # Uses env var MIN_FUNCTION_COMPLEXITY
-                    yara_tags=yara_function_map  # Will be populated if YARA found matches
-                )
-            finally:
-                signal.alarm(0)  # Cancel alarm
+            # Pass YARA results to function extraction for tag association
+            results['functions'] = angr_extract_functions(
+                binary_path,
+                limit=100,
+                min_complexity=None,  # Uses env var MIN_FUNCTION_COMPLEXITY
+                yara_tags=yara_function_map  # Will be populated if YARA found matches
+            )
             
             # Check if function extraction failed
             if 'error' in results['functions']:
@@ -250,20 +245,14 @@ Now classify this binary according to the instructions above. Respond ONLY with 
                 if 'filtered_count' in results['functions']:
                     logger.info(f"   Filtered {results['functions']['filtered_count']} low-complexity functions")
                     logger.info(f"   Complexity threshold: {results['functions'].get('min_complexity_threshold', 3)}")
-                    
-                # Log if adaptive retry was used
-                if results['functions'].get('adaptive_retry'):
-                    logger.info(f"   ✅ Adaptive retry enabled (lowered threshold to extract functions)")
         except Exception as e:
             logger.error(f"Function extraction failed: {e}")
             results['functions'] = {'functions': []}
         
-        # Detect crypto patterns (DISABLED FOR SPEED - saves 30+ seconds)
+        # Detect crypto patterns (NEW)
         try:
-            logger.info("⚡ Skipping pattern detection (disabled for speed)")
-            results['patterns'] = {'pattern_summary': {}, 'inferred_algorithms': [], 'skipped': True}
-            if False:  # Disabled
-                results['patterns'] = angr_detect_crypto_patterns(binary_path)
+            logger.info("Starting crypto pattern detection...")
+            results['patterns'] = angr_detect_crypto_patterns(binary_path)
             
             if 'error' in results['patterns']:
                 logger.error(f"❌ Pattern detection failed: {results['patterns']['error']}")
@@ -283,12 +272,10 @@ Now classify this binary according to the instructions above. Respond ONLY with 
             logger.error(f"❌ Pattern detection failed: {e}", exc_info=True)
             results['patterns'] = {'pattern_summary': {}, 'inferred_algorithms': []}
         
-        # Analyze data flow (DISABLED FOR SPEED - saves 20+ seconds)
+        # Analyze data flow (NEW)
         try:
-            logger.info("⚡ Skipping dataflow analysis (disabled for speed)")
-            results['dataflow'] = {'summary': {}, 'crypto_likelihood_score': 0, 'skipped': True}
-            if False:  # Disabled
-                results['dataflow'] = angr_analyze_dataflow(binary_path)
+            logger.info("Starting dataflow analysis...")
+            results['dataflow'] = angr_analyze_dataflow(binary_path)
             
             if 'error' in results['dataflow']:
                 logger.error(f"❌ Dataflow analysis failed: {results['dataflow']['error']}")
@@ -307,13 +294,11 @@ Now classify this binary according to the instructions above. Respond ONLY with 
             logger.error(f"❌ Dataflow analysis failed: {e}", exc_info=True)
             results['dataflow'] = {'summary': {}, 'crypto_likelihood_score': 0}
         
-        # Build function groups (DISABLED FOR SPEED - saves 15+ seconds)
+        # Build function groups for cross-function aggregation (NEW for stripped binaries)
         try:
-            logger.info("⚡ Skipping function groups (disabled for speed)")
-            results['function_groups'] = {'total_groups': 0, 'skipped': True}
-            if False:  # Disabled
-                from src.tools.angr_patterns import angr_build_function_groups
-                results['function_groups'] = angr_build_function_groups(binary_path)
+            logger.info("Building function call graph for aggregation...")
+            from src.tools.angr_patterns import angr_build_function_groups
+            results['function_groups'] = angr_build_function_groups(binary_path)
             group_count = results['function_groups'].get('total_groups', 0)
             largest_group = results['function_groups'].get('largest_group_size', 0)
             logger.info(f"✅ Found {group_count} function groups (largest: {largest_group} functions)")
@@ -440,13 +425,13 @@ Now detect all cryptographic algorithms according to the instructions above. Res
                 'model': 'none'
             }
         
-        # Estimate if batching is needed (reduced threshold for speed)
+        # Estimate if batching is needed
         sample_data = {
             "algorithms": detected_algorithms,
             "functions": functions[:5]  # Sample
         }
         estimated_tokens = self.token_batcher.estimate_tokens_from_dict(sample_data)
-        needs_batching = total_functions > 25 or self.token_batcher.should_batch(estimated_tokens * (total_functions / 5))
+        needs_batching = total_functions > 50 or self.token_batcher.should_batch(estimated_tokens * (total_functions / 5))
         
         if needs_batching:
             logger.info(f"📦 Batching {total_functions} functions for analysis...")
@@ -502,7 +487,7 @@ Now analyze all crypto-related functions in this batch according to the instruct
             }
         else:
             # Single query for all functions
-            logger.info(f"⚡ Fast mode: analyzing {total_functions} functions in single query")
+            logger.info(f"Analyzing {total_functions} functions in single query")
             
             query = f"""
 {func_prompt}
@@ -1148,11 +1133,10 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
         
         Strategies:
         1. Direct parsing
-        2. Strip text before JSON (AI often adds explanations before the JSON)
-        3. Extract from markdown code blocks
-        4. Extract JSON before any explanation text
-        5. Repair common JSON errors (trailing commas, unescaped quotes)
-        6. Regex extraction as last resort
+        2. Extract from markdown code blocks
+        3. Extract JSON before any explanation text
+        4. Repair common JSON errors (trailing commas, unescaped quotes)
+        5. Regex extraction as last resort
         
         Args:
             content: LLM response content
@@ -1171,24 +1155,9 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
             if "Extra data" in str(e):
                 # Extract just the JSON part (before the extra text)
                 try:
+                    # Find where valid JSON ends
                     content_stripped = content.strip()
-                    
-                    # First, find where JSON actually starts (skip any prefix text)
-                    first_bracket = content_stripped.find('[')
-                    first_brace = content_stripped.find('{')
-                    json_start = -1
-                    
-                    if first_bracket != -1 and first_brace != -1:
-                        json_start = min(first_bracket, first_brace)
-                    elif first_bracket != -1:
-                        json_start = first_bracket
-                    elif first_brace != -1:
-                        json_start = first_brace
-                    
-                    if json_start > 0:
-                        content_stripped = content_stripped[json_start:]
-                    
-                    # Now find where valid JSON ends
+                    # Try to parse just up to the error position
                     if content_stripped.startswith('['):
                         # Find the closing bracket
                         bracket_count = 0
@@ -1200,9 +1169,7 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
                                 if bracket_count == 0:
                                     # Found the end of the array
                                     json_only = content_stripped[:i+1]
-                                    parsed = json.loads(json_only)
-                                    logger.info(f"Successfully parsed JSON with 'Extra data' handling in {stage_name}")
-                                    return parsed
+                                    return json.loads(json_only)
                     elif content_stripped.startswith('{'):
                         # Find the closing brace
                         brace_count = 0
@@ -1214,44 +1181,14 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
                                 if brace_count == 0:
                                     # Found the end of the object
                                     json_only = content_stripped[:i+1]
-                                    parsed = json.loads(json_only)
-                                    logger.info(f"Successfully parsed JSON with 'Extra data' handling in {stage_name}")
-                                    return parsed
-                except Exception as parse_error:
-                    logger.debug(f"Extra data handling failed: {parse_error}")
+                                    return json.loads(json_only)
+                except:
+                    pass
             
             logger.debug(f"Direct JSON parse failed in {stage_name}: {e}")
         
-        # Strategy 2: Strip explanatory text BEFORE JSON (common AI behavior)
-        # AI often writes: "I'll analyze the functions:\n\n[\n  {...}\n]"
+        # Strategy 2: Extract from markdown code blocks
         cleaned_content = content.strip()
-        
-        # Find the first [ or { that starts the JSON
-        first_bracket = cleaned_content.find('[')
-        first_brace = cleaned_content.find('{')
-        
-        # Determine which comes first (or if neither exists)
-        json_start = -1
-        if first_bracket != -1 and first_brace != -1:
-            json_start = min(first_bracket, first_brace)
-        elif first_bracket != -1:
-            json_start = first_bracket
-        elif first_brace != -1:
-            json_start = first_brace
-        
-        # If we found a JSON start, try parsing from there
-        if json_start > 0:  # Only if there's text BEFORE the JSON
-            try:
-                cleaned_content = cleaned_content[json_start:]
-                parsed = json.loads(cleaned_content)
-                logger.info(f"Successfully parsed JSON after stripping prefix in {stage_name}")
-                return parsed
-            except json.JSONDecodeError as e:
-                logger.debug(f"Prefix stripping didn't help in {stage_name}: {e}")
-                # Restore for next strategies
-                cleaned_content = content.strip()
-        
-        # Strategy 3: Extract from markdown code blocks
         if "```json" in cleaned_content:
             cleaned_content = cleaned_content.split("```json")[1].split("```")[0].strip()
         elif "```" in cleaned_content:
@@ -1260,7 +1197,7 @@ RESPOND WITH ONLY THE JSON. NO OTHER TEXT.
         
         try:
             parsed = json.loads(cleaned_content)
-            logger.info(f"Successfully parsed JSON from markdown in {stage_name}")
+            logger.info(f"Successfully parsed JSON from {stage_name}")
             return parsed
         except json.JSONDecodeError as e:
             logger.warning(f"Markdown extraction failed in {stage_name}: {e}")

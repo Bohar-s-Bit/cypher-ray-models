@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n{\n  \"protocol\": \"Custom Protocol\",\n  \"version\": null,\n  \"confidence\": 0.85,\n  \"evidence\": [\n    \"Multiple cryptographic algorithms detected in single function\",\n    \"ChaCha20/Salsa20 stream cipher detected\",\n    \"AES/DES block cipher detected\",\n    \"RSA/ECC asymmetric cryptography detected\",\n    \"Multiple hash functions (SHA-256, SHA-1, MD5) present\",\n    \"PBKDF2 key derivation function detected\"\n  ],\n  \"cipher_suites\": [\n    \"ChaCha20-256\",\n    \"AES-128\",\n    \"RSA-2048\",\n    \"SHA-256\",\n    \"PBKDF2\"\n  ],\n  \"implementation_status\": \"complete\",\n  \"security_notes\": \"Complex multi-algorithm cryptographic implementation - requires detailed security review to assess overall security posture\"\n}\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 7413,
+      "output_tokens": 228,
+      "total_tokens": 7641
+    },
+    "cost": 0.0068424,
+    "duration": 5.2348480224609375
+  },
+  "timestamp": 1765281624.1811972,
+  "ttl": 86400,
+  "created_at": "2025-12-09T17:30:24.181198"
+}

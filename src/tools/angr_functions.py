@@ -123,211 +123,20 @@ def angr_extract_functions(
         # Check if loaded as blob (raw binary)
         is_raw_binary = is_blob_loaded(project)
         if is_raw_binary:
-            # For blobs: Use direct function discovery + targeted CFG for top functions
-            min_complexity = 1
-            logger.info(f"⚠️ Loaded as raw binary (blob), using smart function discovery")
-            
-            # Step 1: Get all auto-discovered functions (instant)
-            logger.info("⚡ Step 1: Getting auto-discovered functions...")
-            all_functions = project.kb.functions
-            
-            if len(all_functions) == 0:
-                logger.warning("No functions auto-discovered, using entry point only")
-                functions = [{
-                    "address": hex(project.entry),
-                    "name": "entry_point",
-                    "size": 0,
-                    "num_blocks": 0,
-                    "cyclomatic_complexity": 1,
-                    "calls_crypto_apis": False,
-                    "yara_tags": [],
-                    "has_yara_hit": False,
-                    "complexity_score": 0
-                }]
-                return {
-                    "total_functions": 1,
-                    "functions": functions,
-                    "analyzed_count": 1,
-                    "filtered_count": 0,
-                    "min_complexity_threshold": min_complexity,
-                    "fast_mode": True
-                }
-            
-            logger.info(f"✅ Found {len(all_functions)} auto-discovered functions")
-            
-            # Step 2: Build candidates from YARA hit addresses (targeted search)
-            logger.info("⚡ Step 2: Building candidates from YARA hit addresses...")
-            candidates = []
-            yara_addrs = set(yara_tags.keys()) if yara_tags else set()
-            
-            logger.info(f"🎯 Searching for functions at {len(yara_addrs)} YARA hit addresses")
-            
-            # Search for functions at each YARA address
-            for addr in yara_addrs:
-                if addr in all_functions:
-                    func = all_functions[addr]
-                    candidates.append((addr, func, True))
-                    logger.debug(f"  ✓ Found function at {hex(addr)}")
-            
-            logger.info(f"✅ Found {len(candidates)}/{len(yara_addrs)} functions at YARA addresses")
-            
-            # Add some large functions nearby YARA hits for context
-            if len(candidates) < 12:
-                logger.info("⚡ Supplementing with nearby large functions...")
-                for addr, func in list(all_functions.items())[:300]:
-                    if addr in yara_addrs:
-                        continue
-                    
-                    size = func.size if hasattr(func, 'size') else 0
-                    # Check if near any YARA address (within 4KB)
-                    near_yara = any(abs(addr - yaddr) < 4096 for yaddr in yara_addrs)
-                    
-                    if near_yara and size >= 100:
-                        candidates.append((addr, func, False))
-                    
-                    if len(candidates) >= 12:
-                        break
-            
-            logger.info(f"✅ Total {len(candidates)} candidates for CFG analysis")
-            
-            # CRITICAL: If we have YARA hits but no matching functions, synthesize them
-            if len(candidates) == 0 and yara_addrs:
-                logger.warning(f"⚠️ {len(yara_addrs)} YARA hits but no matching functions - synthesizing")
-                functions = []
-                for addr in sorted(list(yara_addrs))[:10]:  # Top 10 YARA addresses
-                    func_yara_tags = yara_tags.get(addr, [])
-                    # Create synthetic function from YARA data
-                    functions.append({
-                        "address": hex(addr),
-                        "name": f"sub_{hex(addr)[2:]}",
-                        "size": 0,
-                        "num_blocks": 0,
-                        "cyclomatic_complexity": 5,  # Default moderate complexity
-                        "calls_crypto_apis": True,
-                        "yara_tags": func_yara_tags,
-                        "has_yara_hit": True,
-                        "complexity_score": 0
-                    })
-                
-                logger.info(f"✅ Synthesized {len(functions)} functions from YARA addresses")
-                return {
-                    "total_functions": len(all_functions),
-                    "functions": functions,
-                    "analyzed_count": len(functions),
-                    "filtered_count": 0,
-                    "min_complexity_threshold": min_complexity,
-                    "fast_mode": True,
-                    "synthetic": True
-                }
-            
-            # If still no candidates, return entry point only
-            if len(candidates) == 0:
-                logger.warning("No crypto-relevant candidates found, using entry point")
-                functions = [{
-                    "address": hex(project.entry),
-                    "name": "entry_point",
-                    "size": 0,
-                    "num_blocks": 0,
-                    "cyclomatic_complexity": 1,
-                    "calls_crypto_apis": False,
-                    "yara_tags": [],
-                    "has_yara_hit": False,
-                    "complexity_score": 0
-                }]
-                return {
-                    "total_functions": len(all_functions),
-                    "functions": functions,
-                    "analyzed_count": 1,
-                    "filtered_count": 0,
-                    "min_complexity_threshold": min_complexity,
-                    "fast_mode": True
-                }
-            
-            # Step 3: Quick targeted CFG for just these candidates (15-20s)
-            logger.info(f"⚡ Step 3: Building targeted CFG for {min(len(candidates), 8)} functions...")
-            function_addrs = [addr for addr, _, _ in candidates]
-            
-            try:
-                import signal
-                def timeout_handler(signum, frame):
-                    raise TimeoutError("Targeted CFG timeout")
-                
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(20)  # 20s max for targeted CFG
-                
-                with suppress_stdout():
-                    # Only analyze top 8 functions to stay under timeout
-                    cfg = project.analyses.CFGFast(
-                        normalize=False,
-                        force_complete_scan=False,
-                        resolve_indirect_jumps=False,
-                        data_references=False,
-                        cross_references=False,
-                        function_starts=function_addrs[:8]  # Only 8 functions for reliability
-                    )
-                signal.alarm(0)
-                logger.info("✅ Targeted CFG complete")
-                cfg_functions = cfg.functions
-            except (TimeoutError, Exception) as e:
-                signal.alarm(0)
-                logger.warning(f"⚠️ Targeted CFG failed ({e}), using YARA-based function synthesis")
-                # CRITICAL FALLBACK: Create synthetic functions from YARA hits
-                # This ensures we ALWAYS return crypto-relevant functions even if CFG fails
-                functions = []
-                for addr, func, has_yara in candidates[:10]:  # Top 10 candidates
-                    func_yara_tags = yara_tags.get(addr, []) if yara_tags else []
-                    size = func.size if hasattr(func, 'size') else 0
-                    
-                    # Synthesize function info from available data
-                    func_name = func.name if hasattr(func, 'name') else f"sub_{hex(addr)[2:]}"
-                    
-                    # Estimate complexity from size (rough heuristic)
-                    estimated_complexity = max(3, min(15, size // 50)) if size > 0 else 3
-                    
-                    functions.append({
-                        "address": hex(addr),
-                        "name": func_name,
-                        "size": size,
-                        "num_blocks": 0,  # Unknown without CFG
-                        "cyclomatic_complexity": estimated_complexity,
-                        "calls_crypto_apis": False,
-                        "yara_tags": func_yara_tags,
-                        "has_yara_hit": len(func_yara_tags) > 0,
-                        "complexity_score": 0
-                    })
-                
-                logger.info(f"✅ Synthesized {len(functions)} functions from YARA data")
-                
-                return {
-                    "total_functions": len(all_functions),
-                    "functions": functions,
-                    "analyzed_count": len(functions),
-                    "filtered_count": 0,
-                    "min_complexity_threshold": min_complexity,
-                    "fast_mode": True,
-                    "synthetic": True  # Flag that these are synthesized
-                }
-                
-            # If we reach here, CFG succeeded
-            cfg_functions = cfg.functions
-        else:
-            # For structured binaries: Use normal CFG
-            with suppress_stdout():
-                cfg = project.analyses.CFGFast(
-                    normalize=True,
-                    force_complete_scan=False,
-                    resolve_indirect_jumps=False,
-                    data_references=False,
-                    cross_references=False
-                )
-            cfg_functions = cfg.functions
+            logger.warning("⚠️ Loaded as raw binary (blob), CFG may be incomplete")
+            # For blob-loaded binaries, increase complexity threshold to filter noise
+            min_complexity = max(min_complexity, 8)  # At least 8 for raw binaries (aggressive filtering)
+            logger.info(f"   Blob loader detected: increasing min_complexity to {min_complexity}")
+        
+        with suppress_stdout():
+            cfg = project.analyses.CFGFast()
+        
         functions = []
         filtered_count = 0
         total_analyzed = 0  # Track how many we analyzed
-        max_to_analyze = 100 if is_raw_binary else 300  # Analyze more to find crypto-relevant ones
-        max_functions = 10  # Only return top 10 functions
+        max_to_analyze = 500 if is_raw_binary else 100000  # Aggressive limit for blob binaries
         
-        for addr, func in cfg_functions.items():
+        for addr, func in cfg.functions.items():
             total_analyzed += 1
             
             # Early exit for blob binaries to prevent excessive analysis time
@@ -350,18 +159,11 @@ def angr_extract_functions(
                 has_yara_hit = True
                 func_yara_tags = yara_tags[addr]
             
-            # Smart filtering for blobs: Keep if (complexity >= 3) OR (has YARA hit)
-            # This ensures we only get crypto-relevant functions
-            if is_raw_binary:
-                # For blobs: Only keep functions with YARA hits OR complexity >= 3
-                if not has_yara_hit and complexity < 3:
-                    filtered_count += 1
-                    continue
-            else:
-                # For structured binaries: Use normal threshold
-                if complexity < min_complexity and not has_yara_hit:
-                    filtered_count += 1
-                    continue
+            # Filtering logic: Keep if (complexity >= threshold) OR (has YARA hit)
+            # This ensures we don't discard crypto functions even if they're simple
+            if complexity < min_complexity and not has_yara_hit:
+                filtered_count += 1
+                continue
             
             # Include this function
             func_info = {
@@ -378,26 +180,17 @@ def angr_extract_functions(
             
             functions.append(func_info)
             
-            # Stop if we have enough functions
-            if len(functions) >= max_functions:
-                logger.info(f"✅ Collected {max_functions} crypto-relevant functions, stopping early")
-                break
-            
+            # Stop if we hit the limit
             if len(functions) >= limit:
                 break
         
-        # Sort by priority: YARA hits first, then by complexity
-        functions.sort(key=lambda f: (not f['has_yara_hit'], -f['cyclomatic_complexity']))
+        # Sort by complexity (most complex first) to prioritize interesting functions
+        functions.sort(key=lambda f: f['cyclomatic_complexity'], reverse=True)
         
-        # Limit to top 10 functions
-        if len(functions) > max_functions:
-            logger.info(f"📊 Keeping top {max_functions} most relevant functions (out of {len(functions)})")
-            functions = functions[:max_functions]
-        
-        logger.info(f"✅ Extracted {len(functions)} functions (filtered out {filtered_count} low-complexity)")
+        logger.info(f"Extracted {len(functions)} functions (filtered out {filtered_count} low-complexity)")
         
         return {
-            "total_functions": len(cfg_functions) if cfg_functions else 0,
+            "total_functions": len(cfg.functions),
             "functions": functions,
             "analyzed_count": len(functions),
             "filtered_count": filtered_count,

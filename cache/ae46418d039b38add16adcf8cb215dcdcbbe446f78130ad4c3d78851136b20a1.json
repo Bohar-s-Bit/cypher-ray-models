@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n    {\n        \"name\": \"SHA-256\",\n        \"type\": \"hash\",\n        \"confidence\": 0.95,\n        \"evidence\": [\n            \"Hash constants detected: [1116352408, 1899447441, 3921009573, 3049323471]\",\n            \"SHA-256 K constants found at 0x13bc, 0x13c0, 0x13c4\",\n            \"Multiple functions with SHA-256 hash pattern detected\"\n        ],\n        \"functions\": [\n            \"_main\", \n            \"sub_100001488\", \n            \"sub_1000012c4\", \n            \"sub_1000012dc\"\n        ],\n        \"locations\": [\n            \"0x13bc\", \n            \"0x13c0\", \n            \"0x13c4\"\n        ],\n        \"is_proprietary\": false,\n        \"standard_library\": null,\n        \"cipher_characteristics\": {\n            \"cipher_type\": null,\n            \"mode_of_operation\": null,\n            \"key_size_bits\": null,\n            \"block_size_bits\": 512,\n            \"iv_nonce_required\": false\n        }\n    },\n    {\n        \"name\": \"AES\",\n        \"type\": \"symmetric\",\n        \"confidence\": 0.85,\n        \"evidence\": [\n            \"AES S-box constants found at 0x1000012b0\",\n            \"AES RCON constants found at 0x1000013b0\", \n            \"S-box pattern with 64 and 133 table accesses\",\n            \"Substitution-Permutation Network (SPN) structure detected\"\n        ],\n        \"functions\": [\n            \"_main\", \n            \"__u0\", \n            \"sub_10000135c\"\n        ],\n        \"locations\": [\n            \"0x1000012b0\", \n            \"0x1000013b0\"\n        ],\n        \"is_proprietary\": false,\n        \"standard_library\": null,\n        \"cipher_characteristics\": {\n            \"cipher_type\": \"block\",\n            \"mode_of_operation\": null,\n            \"key_size_bits\": null,\n            \"block_size_bits\": 128,\n            \"iv_nonce_required\": null\n        }\n    },\n    {\n        \"name\": \"ChaCha20/Salsa20\",\n        \"type\": \"symmetric\",\n        \"confidence\": 0.75,\n        \"evidence\": [\n            \"ARX pattern detected (ADD:42, XOR:103, ROT:19)\",\n            \"Quarter-round function constants detected at 0x344\",\n            \"Stream cipher with Add-Rotate-XOR operations\"\n        ],\n        \"functions\": [\n            \"__u0\"\n        ],\n        \"locations\": [\n            \"0x344\"\n        ],\n        \"is_proprietary\": false,\n        \"standard_library\": null,\n        \"cipher_characteristics\": {\n            \"cipher_type\": \"stream\",\n            \"mode_of_operation\": null,\n            \"key_size_bits\": null,\n            \"block_size_bits\": null,\n            \"iv_nonce_required\": true\n        }\n    }\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 15916,
+      "output_tokens": 779,
+      "total_tokens": 16695
+    },
+    "cost": 0.0158488,
+    "duration": 13.43581509590149
+  },
+  "timestamp": 1765281684.375077,
+  "ttl": 86400,
+  "created_at": "2025-12-09T17:31:24.375078"
+}

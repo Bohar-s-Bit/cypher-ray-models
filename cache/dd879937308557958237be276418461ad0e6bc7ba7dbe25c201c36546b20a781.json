@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n{\n  \"protocol\": \"Custom Protocol\",\n  \"version\": null,\n  \"confidence\": 0.7,\n  \"evidence\": [\n    \"RSA/ECC asymmetric cryptography detected\",\n    \"SHA-256 hash function present\",\n    \"BLAKE2 hash function detected\",\n    \"Multiple symmetric encryption methods (RC4, XOR, AES/DES)\",\n    \"PBKDF2 key derivation function detected\"\n  ],\n  \"cipher_suites\": [\n    \"RSA/ECC\",\n    \"SHA-256\",\n    \"BLAKE2\",\n    \"RC4\",\n    \"XOR\",\n    \"AES/DES\"\n  ],\n  \"implementation_status\": \"partial\",\n  \"security_notes\": \"Custom cryptographic implementation with multiple algorithms - requires thorough security review\"\n}\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 6362,
+      "output_tokens": 205,
+      "total_tokens": 6567
+    },
+    "cost": 0.005909600000000001,
+    "duration": 5.0170159339904785
+  },
+  "timestamp": 1765531769.282363,
+  "ttl": 86400,
+  "created_at": "2025-12-12T14:59:29.282364"
+}

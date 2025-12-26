@@ -119,7 +119,6 @@ For EACH crypto function, provide **DETAILED** analysis:
 ```
 
 **IMPORTANT: related_algorithm MUST be a STRING, not an array!**
-
 - If function relates to ONE algorithm: `"related_algorithm": "AES-256"`
 - If function relates to MULTIPLE algorithms: `"related_algorithm": "SHA-256, AES-128/AES-256, ChaCha20"`
 - If no specific algorithm: `"related_algorithm": null`
@@ -231,25 +230,6 @@ For EACH crypto function, provide **DETAILED** analysis:
 5. **Technical Accuracy**: Use correct cryptographic terminology
 6. **Match Algorithms**: If an algorithm was detected, map functions to it and explain their role
 7. **Focus on Crypto**: Only analyze functions that perform cryptographic operations
-
-## CRITICAL OUTPUT REQUIREMENT
-
-**RETURN ONLY THE JSON ARRAY - NO EXPLANATIONS, NO MARKDOWN, NO PREAMBLE**
-
-✅ Correct:
-
-```
-[{"name":"sub_401000",...}]
-```
-
-❌ Wrong:
-
-```
-Based on the analysis, I'll focus on these functions:
-[{"name":"sub_401000",...}]
-```
-
-**Your response must start with `[` and contain nothing before or after the JSON array.**
 
 **REMEMBER**: The user wants to understand WHAT each function does and HOW it works in detail, not just a brief summary!
 

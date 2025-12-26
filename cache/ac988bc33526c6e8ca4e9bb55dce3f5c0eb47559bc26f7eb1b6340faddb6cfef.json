@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n  {\n    \"type\": \"deprecated_algorithm\",\n    \"severity\": \"critical\",\n    \"algorithm\": \"RC4\",\n    \"description\": \"RC4 stream cipher is deprecated due to known biases in keystream that can lead to information leakage and cryptographic attacks.\",\n    \"evidence\": \"RC4 stream cipher initialization patterns detected at 0x730d8 and 0x142\",\n    \"recommendation\": \"Replace RC4 with modern stream ciphers like ChaCha20 or use AES in CTR mode\"\n  },\n  {\n    \"type\": \"custom_crypto\",\n    \"severity\": \"high\", \n    \"algorithm\": \"XOR Cipher\",\n    \"description\": \"Proprietary XOR encryption detected. Custom cryptographic implementations are highly discouraged due to lack of cryptographic review and potential vulnerabilities.\",\n    \"evidence\": \"XOR encryption/decryption loops detected at 0x6d and 0xa985\",\n    \"recommendation\": \"Replace custom XOR cipher with standard authenticated encryption algorithms like AES-GCM\"\n  },\n  {\n    \"type\": \"weak_algorithm\",\n    \"severity\": \"high\",\n    \"algorithm\": \"AES or DES\",\n    \"description\": \"Potentially weak block cipher implementation with proprietary modifications. Unable to confirm exact algorithm or security properties.\",\n    \"evidence\": \"S-box pattern with multiple table accesses detected in 14 functions, proprietary implementation\",\n    \"recommendation\": \"Use standard, well-reviewed cryptographic library implementations of AES with known secure modes of operation\"\n  }\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 7867,
+      "output_tokens": 367,
+      "total_tokens": 8234
+    },
+    "cost": 0.0077616,
+    "duration": 8.17029094696045
+  },
+  "timestamp": 1765531764.262536,
+  "ttl": 86400,
+  "created_at": "2025-12-12T14:59:24.262536"
+}

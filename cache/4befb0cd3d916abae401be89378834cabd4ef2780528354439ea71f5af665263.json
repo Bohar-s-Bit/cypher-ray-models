@@ -1,0 +1,17 @@
+{
+  "value": {
+    "content": "[\n{\n  \"protocol\": \"Custom Protocol\",\n  \"version\": null,\n  \"confidence\": 0.75,\n  \"evidence\": [\n    \"AES block cipher detected with S-box constants\",\n    \"ChaCha20/Salsa20 stream cipher with ARX operations\",\n    \"SHA-256 hash algorithm present\",\n    \"Multiple cryptographic primitives in main function\"\n  ],\n  \"cipher_suites\": [\n    \"AES-128\",\n    \"ChaCha20\",\n    \"SHA-256\"\n  ],\n  \"implementation_status\": \"partial\",\n  \"security_notes\": \"Multiple strong cryptographic algorithms detected, but no standard protocol identified. Recommend thorough cryptographic review.\"\n}\n]",
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku-20241022",
+    "usage": {
+      "input_tokens": 6147,
+      "output_tokens": 176,
+      "total_tokens": 6323
+    },
+    "cost": 0.0056216,
+    "duration": 4.875866889953613
+  },
+  "timestamp": 1765281709.6308239,
+  "ttl": 86400,
+  "created_at": "2025-12-09T17:31:49.630825"
+}
